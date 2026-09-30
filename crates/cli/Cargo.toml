@@ -1,0 +1,13 @@
+[package]
+name = "ya-gpt-cli"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "CLI scaffold for training and generating text with a GPT model"
+
+[dependencies]
+anyhow.workspace = true
+clap = { workspace = true, features = ["derive"] }
+msgpacker.workspace = true
+rand.workspace = true
+ya-gpt = { path = "../core", features = ["clap"] }

@@ -1,0 +1,11 @@
+[package]
+name = "ya-gpt"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap = { workspace = true, optional = true, features = ["derive"] }
+msgpacker.workspace = true
+rand.workspace = true
+rand_distr.workspace = true
