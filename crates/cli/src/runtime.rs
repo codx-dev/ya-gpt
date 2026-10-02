@@ -4,11 +4,11 @@ use std::{
     path::Path,
 };
 
-use msgpacker::{Packable as _, Unpackable as _};
 use ya_gpt::{
     config::ModelConfig,
-    data::tokenizer::Tokenizer,
-    engine::{gpt::Gpt, naive::Naive, optmizer::AdamW},
+    engine::naive::Naive,
+    model::{gpt::Gpt, optimizer::AdamW},
+    tokenizer::Tokenizer,
 };
 
 use crate::cli::{Command, CommonArgs, Engine, GenerateArgs, TrainingOptions};
@@ -53,15 +53,16 @@ pub fn train(
 
     let tokenizer = Tokenizer::new(&input);
     let mut rng = common.rng();
-    let mut model = Gpt::new(config.clone(), tokenizer.clone(), &mut rng)?;
+    let mut model = Gpt::new(&engine, config.clone(), tokenizer.clone(), &mut rng)?;
 
     let mut optimizer = AdamW::new(
+        &engine,
         &tokenizer,
         &input,
         &mut model,
         config.clone(),
         options.report_loss_per_step,
-    );
+    )?;
     if let Some(batch_size) = options.batch_size {
         optimizer = optimizer.with_batch_size(batch_size);
     }
@@ -76,7 +77,7 @@ pub fn train(
     }
     optimizer.train(&engine, &mut model, &mut rng)?;
 
-    Ok(model.pack_to_vec())
+    model.to_bytes(&engine)
 }
 
 pub fn generate(args: &GenerateArgs) -> anyhow::Result<String> {
@@ -96,9 +97,9 @@ pub fn generate(args: &GenerateArgs) -> anyhow::Result<String> {
     }
 
     let mut rng = args.common.rng();
-    let model = Gpt::unpack(&input)?;
+    let model = Gpt::try_from_bytes(&engine, &input)?;
     let prompt = model.tokenizer.encode(&args.prompt);
-    let output = model.generate(&engine, &prompt, args.num_tokens, &mut rng);
+    let output = model.generate(&engine, &prompt, args.num_tokens, &mut rng)?;
 
     Ok(model.tokenizer.decode(&output))
 }
