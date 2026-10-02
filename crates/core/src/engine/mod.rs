@@ -8,7 +8,6 @@ pub trait Engine {
 
     fn slice(&self, buffer: &Self::Buffer, offset: usize, len: usize) -> Self::Buffer;
     fn copy(&self, dst: &mut Self::Buffer, src: &Self::Buffer, ofs: usize);
-    fn copy_with_len(&self, dst: &mut Self::Buffer, src: &Self::Buffer, ofs: usize, len: usize);
     fn clone(&self, buffer: &Self::Buffer) -> anyhow::Result<Self::Buffer>;
     fn zeroes(&self, len: usize) -> anyhow::Result<Self::Buffer>;
     fn filled(&self, value: f64, len: usize) -> anyhow::Result<Self::Buffer>;
@@ -38,15 +37,6 @@ pub trait Engine {
 
     fn add_in_place(&self, out: &mut Self::Buffer, b: &Self::Buffer) -> anyhow::Result<()>;
 
-    fn add_bias(
-        &self,
-        input: &Self::Buffer,
-        bias: &Self::Buffer,
-        rows: usize,
-        cols: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
     fn add_bias_in_place(
         &self,
         out: &mut Self::Buffer,
@@ -55,21 +45,7 @@ pub trait Engine {
         cols: usize,
     ) -> anyhow::Result<()>;
 
-    fn causal_mask(
-        &self,
-        input: &Self::Buffer,
-        time: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
     fn causal_mask_in_place(&self, out: &mut Self::Buffer, time: usize) -> anyhow::Result<()>;
-
-    fn causal_mask_backward(
-        &self,
-        d_output: &Self::Buffer,
-        time: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
 
     fn causal_mask_backward_in_place(
         &self,

@@ -21,12 +21,6 @@ impl Engine for Naive {
         buf.copy_from_slice(src);
     }
 
-    fn copy_with_len(&self, dst: &mut Self::Buffer, src: &Self::Buffer, ofs: usize, len: usize) {
-        let buf = &mut dst[ofs..ofs + len];
-
-        buf.copy_from_slice(&src[..len]);
-    }
-
     fn clone(&self, buffer: &Self::Buffer) -> anyhow::Result<Self::Buffer> {
         Ok(buffer.clone())
     }
@@ -119,24 +113,6 @@ impl Engine for Naive {
         Ok(())
     }
 
-    fn add_bias(
-        &self,
-        input: &Self::Buffer,
-        bias: &Self::Buffer,
-        rows: usize,
-        cols: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()> {
-        debug_assert!(out.len() >= input.len());
-        debug_assert!(check_matrix(input, rows, cols));
-        debug_assert_eq!(bias.len(), cols);
-        out.fill(0.0);
-        for i in 0..input.len() {
-            out[i] = input[i] + bias[i % cols];
-        }
-        Ok(())
-    }
-
     fn add_bias_in_place(
         &self,
         out: &mut Self::Buffer,
@@ -153,45 +129,11 @@ impl Engine for Naive {
         Ok(())
     }
 
-    fn causal_mask(
-        &self,
-        input: &Self::Buffer,
-        time: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()> {
-        debug_assert!(out.len() >= input.len());
-        debug_assert!(check_matrix(input, time, time));
-        out.clone_from(input);
-        for row in 0..time {
-            for col in row + 1..time {
-                out[row * time + col] = f64::NEG_INFINITY;
-            }
-        }
-        Ok(())
-    }
-
     fn causal_mask_in_place(&self, out: &mut Self::Buffer, time: usize) -> anyhow::Result<()> {
         debug_assert!(check_matrix(out, time, time));
         for row in 0..time {
             for col in row + 1..time {
                 out[row * time + col] = f64::NEG_INFINITY;
-            }
-        }
-        Ok(())
-    }
-
-    fn causal_mask_backward(
-        &self,
-        d_output: &Self::Buffer,
-        time: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()> {
-        debug_assert!(out.len() >= d_output.len());
-        debug_assert!(check_matrix(d_output, time, time));
-        out.clone_from(d_output);
-        for row in 0..time {
-            for col in row + 1..time {
-                out[row * time + col] = 0.0;
             }
         }
         Ok(())

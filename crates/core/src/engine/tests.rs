@@ -237,9 +237,8 @@ fn softmax_is_stable_and_masks_future_positions<E: Engine>(en: &E) {
 
     close(&out, &[0.5, 0.5], 1e-12);
 
-    let c = en.buffer_from_slice([0.0; 9]).unwrap();
     let mut masked = en.zeroes(9).unwrap();
-    en.causal_mask(&c, 3, &mut masked).unwrap();
+    en.causal_mask_in_place(&mut masked, 3).unwrap();
 
     let mut out = en.zeroes(9).unwrap();
     en.softmax_rows(&masked, 3, 3, &mut out).unwrap();
@@ -261,9 +260,8 @@ fn softmax_is_stable_and_masks_future_positions<E: Engine>(en: &E) {
         1e-12,
     );
 
-    let mut out = en.zeroes(9).unwrap();
-    let e = en.buffer_from_slice([1.0; 9]).unwrap();
-    en.causal_mask_backward(&e, 3, &mut out).unwrap();
+    let mut out = en.buffer_from_slice([1.0; 9]).unwrap();
+    en.causal_mask_backward_in_place(&mut out, 3).unwrap();
     let out = en.buffer_to_vec(&out).unwrap();
 
     close(&out, &[1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0], 0.0);
@@ -439,14 +437,8 @@ fn softmax_rows_in_place_handles_single_row_and_column<E: Engine>(en: &E) {
     close(&out, &[1.0], 0.0);
 }
 
-fn causal_mask_in_place_matches_causal_mask<E: Engine>(en: &E) {
+fn causal_mask_in_place_masks_only_future_positions<E: Engine>(en: &E) {
     let values = [-2.0, 0.5, 3.0, 4.0, -5.0, 6.0, -7.0, 8.0, 0.0];
-    let input = en.buffer_from_slice(values).unwrap();
-
-    let mut expected = en.zeroes(values.len()).unwrap();
-    en.causal_mask(&input, 3, &mut expected).unwrap();
-    let expected = en.buffer_to_vec(&expected).unwrap();
-
     let mut out = en.buffer_from_slice(values).unwrap();
     en.causal_mask_in_place(&mut out, 3).unwrap();
     let out = en.buffer_to_vec(&out).unwrap();
@@ -465,7 +457,6 @@ fn causal_mask_in_place_matches_causal_mask<E: Engine>(en: &E) {
             0.0,
         ],
     );
-    assert_eq!(out, expected);
 }
 
 fn causal_mask_in_place_is_idempotent<E: Engine>(en: &E) {
@@ -519,14 +510,8 @@ fn causal_mask_in_place_masks_future_softmax_probabilities<E: Engine>(en: &E) {
     );
 }
 
-fn causal_mask_backward_in_place_matches_causal_mask_backward<E: Engine>(en: &E) {
+fn causal_mask_backward_in_place_zeroes_only_future_gradients<E: Engine>(en: &E) {
     let values = [-2.0, 0.5, 3.0, 4.0, -5.0, 6.0, -7.0, 8.0, 0.25];
-    let input = en.buffer_from_slice(values).unwrap();
-
-    let mut expected = en.zeroes(values.len()).unwrap();
-    en.causal_mask_backward(&input, 3, &mut expected).unwrap();
-    let expected = en.buffer_to_vec(&expected).unwrap();
-
     let mut out = en.buffer_from_slice(values).unwrap();
     en.causal_mask_backward_in_place(&mut out, 3).unwrap();
     let out = en.buffer_to_vec(&out).unwrap();
@@ -536,7 +521,6 @@ fn causal_mask_backward_in_place_matches_causal_mask_backward<E: Engine>(en: &E)
         &[-2.0, 0.0, 0.0, 4.0, -5.0, 0.0, -7.0, 8.0, 0.25],
         0.0,
     );
-    close(&out, &expected, 0.0);
 }
 
 fn causal_mask_backward_in_place_is_idempotent<E: Engine>(en: &E) {
@@ -573,11 +557,10 @@ fn causal_mask_backward_in_place_matches_finite_differences<E: Engine>(en: &E) {
     let x = [0.2, -0.5, 0.7, 1.0, -0.3, 0.1, -0.4, 0.6, 0.8];
     let dy = [0.1, 0.6, -0.8, 0.9, 0.3, -0.2, 0.5, -0.7, 0.4];
 
-    let input = en.buffer_from_slice(x).unwrap();
+    let mut masked = en.buffer_from_slice(x).unwrap();
     let d_output = en.buffer_from_slice(dy).unwrap();
 
-    let mut masked = en.zeroes(9).unwrap();
-    en.causal_mask(&input, 3, &mut masked).unwrap();
+    en.causal_mask_in_place(&mut masked, 3).unwrap();
 
     let mut probabilities = en.zeroes(9).unwrap();
     en.softmax_rows(&masked, 3, 3, &mut probabilities).unwrap();
@@ -591,9 +574,8 @@ fn causal_mask_backward_in_place_matches_finite_differences<E: Engine>(en: &E) {
     close(
         &out,
         &numerical_gradient(&x, |v| {
-            let v = en.buffer_from_slice(v).unwrap();
-            let mut masked = en.zeroes(9).unwrap();
-            en.causal_mask(&v, 3, &mut masked).unwrap();
+            let mut masked = en.buffer_from_slice(v).unwrap();
+            en.causal_mask_in_place(&mut masked, 3).unwrap();
             let mut out = en.zeroes(9).unwrap();
             en.softmax_rows(&masked, 3, 3, &mut out).unwrap();
             let out = en.buffer_to_vec(&out).unwrap();
@@ -602,7 +584,7 @@ fn causal_mask_backward_in_place_matches_finite_differences<E: Engine>(en: &E) {
         }),
         1e-8,
     );
-    close(&[out[1], out[2], out[5]], &[0.0; 3], 0.0);
+    close(&[out[0], out[1], out[2], out[5]], &[0.0; 4], 0.0);
 }
 
 fn normalization_and_loss_match_hand_calculations<E: Engine>(en: &E) {
@@ -659,11 +641,10 @@ fn basic_operations_and_head_layout<E: Engine>(en: &E) {
 
     close(&out, &[3.0, 6.0], 0.0);
 
-    let ca = en.buffer_from_slice([1.0, 2.0, 3.0, 4.0]).unwrap();
+    let mut out = en.buffer_from_slice([1.0, 2.0, 3.0, 4.0]).unwrap();
     let cb = en.buffer_from_slice([5.0, 6.0]).unwrap();
 
-    let mut out = en.zeroes(4).unwrap();
-    en.add_bias(&ca, &cb, 2, 2, &mut out).unwrap();
+    en.add_bias_in_place(&mut out, &cb, 2, 2).unwrap();
     let out = en.buffer_to_vec(&out).unwrap();
 
     close(&out, &[6.0, 8.0, 8.0, 10.0], 0.0);
@@ -902,21 +883,15 @@ fn scale_in_place_handles_single_element_and_empty_buffers<E: Engine>(en: &E) {
     close(&out, &[], 0.0);
 }
 
-fn add_bias_in_place_matches_add_bias_on_rectangular_inputs<E: Engine>(en: &E) {
+fn add_bias_in_place_broadcasts_bias_across_rows<E: Engine>(en: &E) {
     let values = [1.0, -2.0, 0.5, 3.0, 4.0, -0.5];
-    let input = en.buffer_from_slice(values).unwrap();
+    let mut out = en.buffer_from_slice(values).unwrap();
     let bias = en.buffer_from_slice([-0.5, 2.0, 0.0]).unwrap();
 
-    let mut expected = en.zeroes(6).unwrap();
-    en.add_bias(&input, &bias, 2, 3, &mut expected).unwrap();
-    let expected = en.buffer_to_vec(&expected).unwrap();
-
-    let mut out = en.buffer_from_slice(values).unwrap();
     en.add_bias_in_place(&mut out, &bias, 2, 3).unwrap();
     let out = en.buffer_to_vec(&out).unwrap();
 
     close(&out, &[0.5, 0.0, 0.5, 2.5, 6.0, -0.5], 0.0);
-    close(&out, &expected, 0.0);
 }
 
 fn add_bias_in_place_handles_single_row_and_column<E: Engine>(en: &E) {
@@ -1219,8 +1194,8 @@ fn relu_dropout_bias_and_embedding_gradients_match_finite_differences<E: Engine>
         &out,
         &numerical_gradient(&[0.1, 0.2, 0.3], |v| {
             let v = en.buffer_from_slice(v).unwrap();
-            let mut out = en.zeroes(6).unwrap();
-            en.add_bias(&aa, &v, 2, 3, &mut out).unwrap();
+            let mut out = en.buffer_from_slice(x).unwrap();
+            en.add_bias_in_place(&mut out, &v, 2, 3).unwrap();
             let out = en.buffer_to_vec(&out).unwrap();
 
             dot(&out, &dy)
@@ -1358,45 +1333,6 @@ fn softmax_handles_masked_entries_and_independent_row_offsets<E: Engine>(en: &E)
     let out = en.buffer_to_vec(&out).unwrap();
 
     close(&out, &[1.0 / 3.0, 2.0 / 3.0, 0.0, 0.75, 0.25, 0.0], 1e-12);
-}
-
-fn masked_softmax_gradients_match_finite_differences<E: Engine>(en: &E) {
-    let x = [0.2, -0.5, 0.7, 1.0, -0.3, 0.1, -0.4, 0.6, 0.8];
-    let dy = [0.1, 0.6, -0.8, 0.9, 0.3, -0.2, 0.5, -0.7, 0.4];
-
-    let a = en.buffer_from_slice(x).unwrap();
-    let b = en.buffer_from_slice(dy).unwrap();
-
-    let mut masked = en.zeroes(9).unwrap();
-    en.causal_mask(&a, 3, &mut masked).unwrap();
-
-    let mut probabilities = en.zeroes(9).unwrap();
-    en.softmax_rows(&masked, 3, 3, &mut probabilities).unwrap();
-
-    let mut gradient = en.zeroes(9).unwrap();
-    en.softmax_rows_backward(&probabilities, &b, 3, 3, &mut gradient)
-        .unwrap();
-
-    let mut out = en.zeroes(9).unwrap();
-    en.causal_mask_backward(&gradient, 3, &mut out).unwrap();
-    let out = en.buffer_to_vec(&out).unwrap();
-
-    close(
-        &out,
-        &numerical_gradient(&x, |v| {
-            let v = en.buffer_from_slice(v).unwrap();
-            let mut masked = en.zeroes(9).unwrap();
-            en.causal_mask(&v, 3, &mut masked).unwrap();
-            let mut out = en.zeroes(9).unwrap();
-            en.softmax_rows(&masked, 3, 3, &mut out).unwrap();
-            let out = en.buffer_to_vec(&out).unwrap();
-
-            dot(&out, &dy)
-        }),
-        1e-8,
-    );
-
-    close(&[out[0], out[1], out[2], out[5]], &[0.0; 4], 0.0);
 }
 
 fn cross_entropy_gradients_average_rows_and_handle_extreme_logits<E: Engine>(en: &E) {
@@ -1587,11 +1523,11 @@ pub fn full_suite<E: Engine>(engine: &E) {
     softmax_rows_in_place_is_stable_for_extreme_logits(engine);
     softmax_rows_in_place_handles_masked_entries(engine);
     softmax_rows_in_place_handles_single_row_and_column(engine);
-    causal_mask_in_place_matches_causal_mask(engine);
+    causal_mask_in_place_masks_only_future_positions(engine);
     causal_mask_in_place_is_idempotent(engine);
     causal_mask_in_place_preserves_single_position(engine);
     causal_mask_in_place_masks_future_softmax_probabilities(engine);
-    causal_mask_backward_in_place_matches_causal_mask_backward(engine);
+    causal_mask_backward_in_place_zeroes_only_future_gradients(engine);
     causal_mask_backward_in_place_is_idempotent(engine);
     causal_mask_backward_in_place_handles_single_position_and_zero_gradients(engine);
     causal_mask_backward_in_place_matches_finite_differences(engine);
@@ -1609,7 +1545,7 @@ pub fn full_suite<E: Engine>(engine: &E) {
     scale_in_place_handles_zero_and_identity_factors(engine);
     scale_in_place_composes_repeated_calls(engine);
     scale_in_place_handles_single_element_and_empty_buffers(engine);
-    add_bias_in_place_matches_add_bias_on_rectangular_inputs(engine);
+    add_bias_in_place_broadcasts_bias_across_rows(engine);
     add_bias_in_place_handles_single_row_and_column(engine);
     add_bias_in_place_handles_zero_bias_and_zero_input(engine);
     add_bias_in_place_accumulates_repeated_calls(engine);
@@ -1622,7 +1558,6 @@ pub fn full_suite<E: Engine>(engine: &E) {
     vector_matrix_products_overwrite_reused_outputs(engine);
     uneven_column_layouts_preserve_row_order(engine);
     softmax_handles_masked_entries_and_independent_row_offsets(engine);
-    masked_softmax_gradients_match_finite_differences(engine);
     cross_entropy_gradients_average_rows_and_handle_extreme_logits(engine);
     single_class_softmax_and_loss_have_zero_gradients(engine);
     constant_layer_norm_rows_have_finite_gradients(engine);
