@@ -10,3 +10,8 @@ clap = { workspace = true, optional = true, features = ["derive"] }
 msgpacker.workspace = true
 rand.workspace = true
 rand_distr.workspace = true
+serde.workspace = true
+wide = { workspace = true, optional = true }
+
+[features]
+simd-wide = ["wide"]

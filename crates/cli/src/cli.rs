@@ -24,6 +24,7 @@ impl Cli {
                 Self::command().error(ErrorKind::ValueValidation, message.to_string())
             }),
             Command::Generate(_) => Ok(()),
+            Command::Inspect(_) => Ok(()),
         }
     }
 }
@@ -34,6 +35,8 @@ pub enum Command {
     Train(TrainArgs),
     /// Generate text from a prompt.
     Generate(GenerateArgs),
+    /// Inspect the model contents.
+    Inspect(InspectArgs),
 }
 
 #[derive(Args, Debug)]
@@ -59,6 +62,9 @@ impl CommonArgs {
 #[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Engine {
     Naive,
+
+    #[cfg(feature = "simd-wide")]
+    SimdWide,
 }
 
 #[derive(Args, Debug)]
@@ -233,6 +239,13 @@ pub struct GenerateArgs {
     /// Number of new tokens to generate.
     #[arg(long, value_parser = positive_usize)]
     pub num_tokens: usize,
+}
+
+#[derive(Args, Debug)]
+pub struct InspectArgs {
+    /// Read model from this file; defaults to stdin.
+    #[arg(short, long, value_name = "FILE")]
+    pub input: Option<PathBuf>,
 }
 
 #[cfg(test)]

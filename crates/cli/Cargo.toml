@@ -1,12 +1,15 @@
 [package]
 name = "ya-gpt-cli"
-version = "0.1.0"
-edition = "2024"
-rust-version = "1.85"
-description = "CLI scaffold for training and generating text with a GPT model"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
 
 [dependencies]
 anyhow.workspace = true
 clap = { workspace = true, features = ["derive"] }
 rand.workspace = true
+serde_json.workspace = true
 ya-gpt = { path = "../core", features = ["clap"] }
+
+[features]
+simd-wide = ["ya-gpt/simd-wide"]

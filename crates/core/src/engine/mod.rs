@@ -3,6 +3,9 @@ mod types;
 pub mod naive;
 pub use types::*;
 
+#[cfg(feature = "simd-wide")]
+pub mod wide;
+
 #[allow(clippy::too_many_arguments)]
 pub trait Engine {
     type Buffer;

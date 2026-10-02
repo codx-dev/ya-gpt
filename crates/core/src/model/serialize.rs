@@ -1,33 +1,46 @@
 use std::io;
 
 use msgpacker::{BufMut, Encoder, MsgPacker, Packable as _, Unpackable};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     engine::Engine,
     model::{Block, LayerNorm, Linear, Parameter, gpt::Gpt},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, MsgPacker)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, MsgPacker)]
 pub struct ModelHeader {
     pub name: String,
     pub authors: String,
     pub major: String,
     pub fp: String,
+    pub params: usize,
 }
 
 impl ModelHeader {
-    pub fn current() -> Self {
+    const NAME: &str = env!("CARGO_PKG_NAME");
+    const MAJOR: &str = env!("CARGO_PKG_VERSION_MAJOR");
+    const FP: &str = "f32";
+
+    pub fn from_model<EN: Engine>(en: &EN, model: &Gpt<EN>) -> Self {
         Self {
-            name: env!("CARGO_PKG_NAME").to_owned(),
+            name: Self::NAME.to_owned(),
             authors: env!("CARGO_PKG_AUTHORS").to_owned(),
-            major: env!("CARGO_PKG_VERSION_MAJOR").to_owned(),
-            fp: "f32".to_owned(),
+            major: Self::MAJOR.to_owned(),
+            fp: Self::FP.to_owned(),
+            params: model.parameter_count(en),
         }
+    }
+
+    pub fn is_current(&self) -> bool {
+        self.name == Self::NAME && self.major == Self::MAJOR && self.fp == Self::FP
     }
 }
 
 impl<EN: Engine> Gpt<EN> {
     pub fn to_bytes(&self, en: &EN) -> anyhow::Result<Vec<u8>> {
+        let header = ModelHeader::from_model(en, self);
+
         let Self {
             config,
             vocab_size,
@@ -41,7 +54,6 @@ impl<EN: Engine> Gpt<EN> {
 
         let mut encoder_owned = Encoder::new();
         let encoder = &mut encoder_owned;
-        let header = ModelHeader::current();
 
         header.pack(encoder);
         config.pack(encoder);
@@ -62,12 +74,16 @@ impl<EN: Engine> Gpt<EN> {
         Ok(encoder_owned.into_inner())
     }
 
+    pub fn header_from_bytes(bytes: &[u8]) -> anyhow::Result<ModelHeader> {
+        unpack_from_cursor(&mut io::Cursor::new(bytes))
+    }
+
     pub fn try_from_bytes(en: &EN, bytes: &[u8]) -> anyhow::Result<Self> {
         let cursor = &mut io::Cursor::new(bytes);
 
         let header: ModelHeader = unpack_from_cursor(cursor)?;
 
-        anyhow::ensure!(header == ModelHeader::current(), "model header mismatch");
+        anyhow::ensure!(header.is_current(), "model header mismatch");
 
         let config = unpack_from_cursor(cursor)?;
         let vocab_size = unpack_from_cursor(cursor)?;
