@@ -1,7 +1,10 @@
 pub mod gpt;
 pub mod optimizer;
 pub mod serialize;
-pub mod types;
+
+mod types;
+
+pub use types::*;
 
 #[cfg(test)]
 mod tests;

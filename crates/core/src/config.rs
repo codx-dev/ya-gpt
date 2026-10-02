@@ -7,7 +7,7 @@ pub struct ModelConfig {
     pub n_embd: usize,
     pub n_head: usize,
     pub n_layer: usize,
-    pub dropout: f64,
+    pub dropout: f32,
 }
 
 impl ModelConfig {
@@ -62,6 +62,7 @@ impl ModelConfig {
     }
 
     pub fn validate(self, vocab_size: Option<usize>) -> anyhow::Result<Self> {
+        anyhow::ensure!(vocab_size != Some(0), "vocabulary cannot be empty");
         anyhow::ensure!(self.block_size != 0, "block size cannot be zero");
         anyhow::ensure!(self.n_embd != 0, "embedding width cannot be zero");
         anyhow::ensure!(self.n_head != 0, "number of heads cannot be zero");
@@ -86,7 +87,7 @@ impl ModelConfig {
                 .try_fold(1usize, |n, d| n.checked_mul(d));
 
             anyhow::ensure!(
-                !elements.is_none_or(|n| n > isize::MAX as usize / size_of::<f64>()),
+                !elements.is_none_or(|n| n > isize::MAX as usize / size_of::<f32>()),
                 "model dimensions are too large"
             );
         }

@@ -2,6 +2,7 @@
 name = "ya-gpt"
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
 
 [dependencies]
 anyhow.workspace = true

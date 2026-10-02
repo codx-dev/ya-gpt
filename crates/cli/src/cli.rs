@@ -81,7 +81,7 @@ pub struct ModelArgs {
 
     /// Dropout probability in [0, 1); otherwise taken from the preset.
     #[arg(required_unless_present = "preset", value_parser = unit_interval)]
-    pub dropout: Option<f64>,
+    pub dropout: Option<f32>,
 }
 
 #[derive(Args, Debug)]
@@ -107,11 +107,11 @@ pub struct TrainArgs {
 
     /// Learning rate, between 0.0 and 1.0 inclusive.
     #[arg(long, value_parser = unit_interval)]
-    pub learning_rate: Option<f64>,
+    pub learning_rate: Option<f32>,
 
     /// Weight decay, between 0.0 and 1.0 inclusive.
     #[arg(long, value_parser = unit_interval)]
-    pub weight_decay: Option<f64>,
+    pub weight_decay: Option<f32>,
 
     /// Report cross-entropy loss to stderr after every training step (adds overhead).
     #[arg(long)]
@@ -180,8 +180,8 @@ impl TrainArgs {
 pub struct TrainingOptions {
     pub batch_size: Option<usize>,
     pub iterations: Option<usize>,
-    pub learning_rate: Option<f64>,
-    pub weight_decay: Option<f64>,
+    pub learning_rate: Option<f32>,
+    pub weight_decay: Option<f32>,
     pub input: Option<PathBuf>,
     pub report_loss_per_step: bool,
 }

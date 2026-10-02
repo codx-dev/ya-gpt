@@ -1,237 +1,132 @@
+mod types;
+
 pub mod naive;
+pub use types::*;
 
-#[cfg(test)]
-pub mod tests;
-
+#[allow(clippy::too_many_arguments)]
 pub trait Engine {
     type Buffer;
+    type IndexBuffer;
+    type BlockCache: Default;
+    type LayerNormCache: Default;
+    type Workspace: Default;
 
-    fn slice(&self, buffer: &Self::Buffer, offset: usize, len: usize) -> Self::Buffer;
-    fn copy(&self, dst: &mut Self::Buffer, src: &Self::Buffer, ofs: usize);
-    fn clone(&self, buffer: &Self::Buffer) -> anyhow::Result<Self::Buffer>;
     fn zeroes(&self, len: usize) -> anyhow::Result<Self::Buffer>;
-    fn filled(&self, value: f64, len: usize) -> anyhow::Result<Self::Buffer>;
+    fn filled(&self, value: f32, len: usize) -> anyhow::Result<Self::Buffer>;
+
     fn buffer_len(&self, buffer: &Self::Buffer) -> usize;
-    fn buffer_from_slice<S: AsRef<[f64]>>(&self, slice: S) -> anyhow::Result<Self::Buffer>;
-    fn buffer_to_vec(&self, buffer: &Self::Buffer) -> anyhow::Result<Vec<f64>>;
+    fn buffer_from_slice(&self, values: &[f32]) -> anyhow::Result<Self::Buffer>;
+    fn buffer_to_vec(&self, buffer: &Self::Buffer) -> anyhow::Result<Vec<f32>>;
+    fn indices_from_slice(&self, values: &[usize]) -> anyhow::Result<Self::IndexBuffer>;
+    fn synchronize(&self) -> anyhow::Result<()>;
 
-    fn buffer_all_finite(&self, buffer: &Self::Buffer) -> anyhow::Result<bool>;
-
-    #[allow(clippy::too_many_arguments)]
-    fn adamw_in_place(
+    fn block_forward(
         &self,
-        values: &mut Self::Buffer,
-        gradients: &Self::Buffer,
-        first_moment: &mut Self::Buffer,
-        second_moment: &mut Self::Buffer,
-        learning_rate: f64,
-        weight_decay: f64,
-        beta1: f64,
-        beta2: f64,
-        epsilon: f64,
-        step: i32,
+        spec: BlockSpec,
+        weights: BlockWeights<'_, Self::Buffer>,
+        input: &Self::Buffer,
+        mode: ForwardMode,
+        ws: &mut Self::Workspace,
+        output: &mut Self::Buffer,
+        cache: Option<&mut Self::BlockCache>,
     ) -> anyhow::Result<()>;
 
-    fn add(&self, a: &Self::Buffer, b: &Self::Buffer, out: &mut Self::Buffer)
-    -> anyhow::Result<()>;
-
-    fn add_in_place(&self, out: &mut Self::Buffer, b: &Self::Buffer) -> anyhow::Result<()>;
-
-    fn add_bias_in_place(
+    fn block_backward(
         &self,
-        out: &mut Self::Buffer,
-        bias: &Self::Buffer,
-        rows: usize,
-        cols: usize,
+        spec: BlockSpec,
+        weights: BlockWeights<'_, Self::Buffer>,
+        gradients: BlockGradients<'_, Self::Buffer>,
+        cache: &Self::BlockCache,
+        d_output: &Self::Buffer,
+        ws: &mut Self::Workspace,
+        d_input: &mut Self::Buffer,
     ) -> anyhow::Result<()>;
 
-    fn causal_mask_in_place(&self, out: &mut Self::Buffer, time: usize) -> anyhow::Result<()>;
-
-    fn causal_mask_backward_in_place(
+    fn linear_forward(
         &self,
-        out: &mut Self::Buffer,
-        time: usize,
+        spec: LinearSpec,
+        weights: LinearWeights<'_, Self::Buffer>,
+        input: &Self::Buffer,
+        output: &mut Self::Buffer,
     ) -> anyhow::Result<()>;
 
-    fn concat_columns(
+    fn linear_backward(
         &self,
-        a: &Self::Buffer,
-        b: &Self::Buffer,
-        rows: usize,
-        a_cols: usize,
-        b_cols: usize,
-        out: &mut Self::Buffer,
+        spec: LinearSpec,
+        weights: LinearWeights<'_, Self::Buffer>,
+        gradients: LinearGradients<'_, Self::Buffer>,
+        input: &Self::Buffer,
+        d_output: &Self::Buffer,
+        d_input: &mut Self::Buffer,
+    ) -> anyhow::Result<()>;
+
+    fn layer_norm_forward(
+        &self,
+        spec: NormSpec,
+        weights: NormWeights<'_, Self::Buffer>,
+        input: &Self::Buffer,
+        output: &mut Self::Buffer,
+        cache: Option<&mut Self::LayerNormCache>,
+    ) -> anyhow::Result<()>;
+
+    fn layer_norm_backward(
+        &self,
+        spec: NormSpec,
+        weights: NormWeights<'_, Self::Buffer>,
+        gradients: NormGradients<'_, Self::Buffer>,
+        cache: &Self::LayerNormCache,
+        d_output: &Self::Buffer,
+        d_input: &mut Self::Buffer,
+    ) -> anyhow::Result<()>;
+
+    fn token_position_embedding_forward(
+        &self,
+        spec: EmbeddingSpec,
+        tokens: &Self::IndexBuffer,
+        token_table: &Self::Buffer,
+        position_table: &Self::Buffer,
+        output: &mut Self::Buffer,
+    ) -> anyhow::Result<()>;
+
+    fn token_position_embedding_backward(
+        &self,
+        spec: EmbeddingSpec,
+        tokens: &Self::IndexBuffer,
+        d_output: &Self::Buffer,
+        d_token_table: &mut Self::Buffer,
+        d_position_table: &mut Self::Buffer,
     ) -> anyhow::Result<()>;
 
     fn cross_entropy(
         &self,
         logits: &Self::Buffer,
-        targets: &[usize],
+        targets: &Self::IndexBuffer,
         rows: usize,
         vocab: usize,
-    ) -> anyhow::Result<f64>;
+    ) -> anyhow::Result<f32>;
 
-    fn cross_entropy_backward(
+    fn cross_entropy_with_grad(
         &self,
         logits: &Self::Buffer,
-        targets: &[usize],
+        targets: &Self::IndexBuffer,
         rows: usize,
         vocab: usize,
-        out: &mut Self::Buffer,
+        d_logits: &mut Self::Buffer,
+    ) -> anyhow::Result<f32>;
+
+    fn buffers_all_finite(&self, buffers: &[&Self::Buffer]) -> anyhow::Result<bool>;
+
+    fn adamw_step(
+        &self,
+        groups: &mut [AdamWGroup<'_, Self::Buffer>],
+        config: AdamWConfig,
     ) -> anyhow::Result<()>;
 
-    fn dropout(
+    fn sample_last_token(
         &self,
-        input: &Self::Buffer,
-        mask: &Self::Buffer,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    fn dropout_in_place(&self, out: &mut Self::Buffer, mask: &Self::Buffer) -> anyhow::Result<()>;
-
-    fn embedding(
-        &self,
-        table: &Self::Buffer,
-        tokens: &[usize],
+        logits: &Self::Buffer,
+        rows: usize,
         vocab: usize,
-        channels: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    fn embedding_backward(
-        &self,
-        tokens: &[usize],
-        d_output: &Self::Buffer,
-        vocab: usize,
-        channels: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    #[allow(clippy::too_many_arguments)]
-    fn layer_norm(
-        &self,
-        input: &Self::Buffer,
-        gamma: &Self::Buffer,
-        beta: &Self::Buffer,
-        rows: usize,
-        cols: usize,
-        epsilon: f64,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    #[allow(clippy::too_many_arguments)]
-    fn layer_norm_backward(
-        &self,
-        input: &Self::Buffer,
-        gamma: &Self::Buffer,
-        d_output: &Self::Buffer,
-        rows: usize,
-        cols: usize,
-        epsilon: f64,
-        d_input: &mut Self::Buffer,
-        d_gamma: &mut Self::Buffer,
-        d_beta: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    fn matmul(
-        &self,
-        a: &Self::Buffer,
-        b: &Self::Buffer,
-        rows: usize,
-        inner: usize,
-        cols: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    #[allow(clippy::too_many_arguments)]
-    fn matmul_backward(
-        &self,
-        a: &Self::Buffer,
-        b: &Self::Buffer,
-        d_output: &Self::Buffer,
-        rows: usize,
-        inner: usize,
-        cols: usize,
-        d_a: &mut Self::Buffer,
-        d_b: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    fn relu(&self, input: &Self::Buffer, out: &mut Self::Buffer) -> anyhow::Result<()>;
-
-    fn relu_backward(
-        &self,
-        input: &Self::Buffer,
-        d_output: &Self::Buffer,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    fn scale(
-        &self,
-        input: &Self::Buffer,
-        factor: f64,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    fn scale_in_place(&self, out: &mut Self::Buffer, factor: f64) -> anyhow::Result<()>;
-
-    fn slice_columns(
-        &self,
-        input: &Self::Buffer,
-        rows: usize,
-        cols: usize,
-        start: usize,
-        width: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    fn softmax(&self, input: &Self::Buffer, out: &mut Self::Buffer) -> anyhow::Result<()>;
-
-    fn softmax_in_place(&self, out: &mut Self::Buffer) -> anyhow::Result<()>;
-
-    fn softmax_rows(
-        &self,
-        input: &Self::Buffer,
-        rows: usize,
-        cols: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    fn softmax_rows_in_place(
-        &self,
-        out: &mut Self::Buffer,
-        rows: usize,
-        cols: usize,
-    ) -> anyhow::Result<()>;
-
-    fn softmax_rows_backward(
-        &self,
-        probabilities: &Self::Buffer,
-        d_output: &Self::Buffer,
-        rows: usize,
-        cols: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    fn sum_rows(
-        &self,
-        input: &Self::Buffer,
-        rows: usize,
-        cols: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    fn transpose(
-        &self,
-        input: &Self::Buffer,
-        rows: usize,
-        cols: usize,
-        out: &mut Self::Buffer,
-    ) -> anyhow::Result<()>;
-
-    fn transpose_in_place(
-        &self,
-        out: &mut Self::Buffer,
-        rows: usize,
-        cols: usize,
-    ) -> anyhow::Result<()>;
+        uniform: f32,
+    ) -> anyhow::Result<usize>;
 }
