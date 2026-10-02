@@ -93,6 +93,9 @@ pub fn train(
     }
 
     match common.engine {
+        #[cfg(feature = "cuda")]
+        Engine::Cuda(n) => run(&ya_gpt_cuda::CudaEngine::new(n)?, common, config, options),
+
         Engine::Naive => run(&engine::naive::Naive, common, config, options),
 
         #[cfg(feature = "simd-wide")]
@@ -113,6 +116,9 @@ pub fn generate(args: &GenerateArgs) -> anyhow::Result<String> {
     }
 
     match args.common.engine {
+        #[cfg(feature = "cuda")]
+        Engine::Cuda(n) => run(&ya_gpt_cuda::CudaEngine::new(n)?, args),
+
         Engine::Naive => run(&engine::naive::Naive, args),
 
         #[cfg(feature = "simd-wide")]
@@ -124,8 +130,13 @@ pub fn inspect(args: &InspectArgs) -> anyhow::Result<String> {
     let bytes = read_bytes_from_input(args.input.as_ref())?;
     // engine is irrelevant for header parse
     let header = Gpt::<engine::naive::Naive>::header_from_bytes(&bytes)?;
+    let output = if args.pretty {
+        format!("{}\n", serde_json::to_string_pretty(&header)?)
+    } else {
+        serde_json::to_string(&header)?
+    };
 
-    Ok(serde_json::to_string(&header)?)
+    Ok(output)
 }
 
 fn read_bytes_from_input(args: Option<&PathBuf>) -> anyhow::Result<Vec<u8>> {

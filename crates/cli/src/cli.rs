@@ -45,8 +45,8 @@ pub struct CommonArgs {
     #[arg(long)]
     pub seed: Option<u64>,
 
-    /// Model execution engine.
-    #[arg(long, value_enum, default_value = "naive")]
+    /// Model execution engine: naive, cuda:device, or simd-wide (when enabled).
+    #[arg(long, default_value = "naive")]
     pub engine: Engine,
 }
 
@@ -59,12 +59,35 @@ impl CommonArgs {
     }
 }
 
-#[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Engine {
+    #[cfg(feature = "cuda")]
+    Cuda(usize),
+
     Naive,
 
     #[cfg(feature = "simd-wide")]
     SimdWide,
+}
+
+impl std::str::FromStr for Engine {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "naive" => Ok(Self::Naive),
+            #[cfg(feature = "simd-wide")]
+            "simd-wide" => Ok(Self::SimdWide),
+            #[cfg(feature = "cuda")]
+            "cuda" => Ok(Self::Cuda(0)),
+            #[cfg(feature = "cuda")]
+            value if value.starts_with("cuda:") => value[5..]
+                .parse()
+                .map(Self::Cuda)
+                .map_err(|_| "CUDA device must be a non-negative integer".to_owned()),
+            _ => Err(format!("unsupported engine: {value}")),
+        }
+    }
 }
 
 #[derive(Args, Debug)]
@@ -246,6 +269,10 @@ pub struct InspectArgs {
     /// Read model from this file; defaults to stdin.
     #[arg(short, long, value_name = "FILE")]
     pub input: Option<PathBuf>,
+
+    /// Pretty print the output.
+    #[arg(long)]
+    pub pretty: bool,
 }
 
 #[cfg(test)]
@@ -274,12 +301,15 @@ mod tests {
             ("medium", ModelConfig::medium(), 32, 5_000),
             ("large", ModelConfig::large(), 64, 10_000),
         ] {
-            let args = parse_train(&["--preset", preset, "--input", "data/input.txt"]);
+            let args = parse_train(&["--preset", preset, "--input", "data/tinyshakespeare.txt"]);
             assert_eq!(args.resolved_model().unwrap(), model);
             let options = args.resolved_options();
             assert_eq!(options.batch_size, Some(batch_size));
             assert_eq!(options.iterations, Some(iterations));
-            assert_eq!(options.input, Some(PathBuf::from("data/input.txt")));
+            assert_eq!(
+                options.input,
+                Some(PathBuf::from("data/tinyshakespeare.txt"))
+            );
         }
     }
 

@@ -22,10 +22,10 @@ check-features:
     --no-dev-deps
 
 train-and-run prompt="ROMEO:":
-  cargo run --release -- train --preset tiny --input data/input.txt | \
+  cargo run --release -- train --preset tiny --input data/tinyshakespeare.txt | \
     cargo run --release -- generate --num-tokens 500 {{prompt}}
 
-train-naive preset="small" iterations="100" input="data/input.txt" output="./out/model-naive.bin":
+train-naive preset="small" iterations="100" input="data/tinyshakespeare.txt" output="./out/model-naive.bin":
   RUSTFLAGS="-C target-cpu=native" \
     cargo run --release -p ya-gpt-cli -- train \
       --engine naive \
@@ -34,10 +34,19 @@ train-naive preset="small" iterations="100" input="data/input.txt" output="./out
       --input {{input}} \
       --output {{output}}
 
-train-simd-wide preset="small" iterations="100" input="data/input.txt" output="./out/model-simd-wide.bin":
+train-simd-wide preset="small" iterations="100" input="data/tinyshakespeare.txt" output="./out/model-simd-wide.bin":
   RUSTFLAGS="-C target-cpu=native" \
     cargo run --release -p ya-gpt-cli --features simd-wide -- train \
       --engine simd-wide \
+      --preset {{preset}} \
+      --iterations {{iterations}} \
+      --input {{input}} \
+      --output {{output}}
+
+train-cuda device="0" preset="small" iterations="100" input="data/tinyshakespeare.txt" output="./out/model-cuda.bin":
+  RUSTFLAGS="-C target-cpu=native" \
+    cargo run --release -p ya-gpt-cli --features cuda -- train \
+      --engine cuda:{{device}} \
       --preset {{preset}} \
       --iterations {{iterations}} \
       --input {{input}} \
@@ -59,7 +68,15 @@ generate-simd-wide tokens="500" input="./out/model-simd-wide.bin" prompt="ROMEO:
       --num-tokens {{tokens}} \
       {{prompt}}
 
-flamegraph preset="tiny" iterations="100" input="data/input.txt" output="./out/model-flamegraph.bin":
+generate-cuda device="0" tokens="500" input="./out/model-cuda.bin" prompt="ROMEO:":
+  RUSTFLAGS="-C target-cpu=native" \
+    cargo run --release -p ya-gpt-cli --features cuda -- generate \
+      --engine cuda:{{device}} \
+      --input {{input}} \
+      --num-tokens {{tokens}} \
+      {{prompt}}
+
+flamegraph preset="tiny" iterations="100" input="data/tinyshakespeare.txt" output="./out/model-flamegraph.bin":
   mkdir -p out
   CARGO_PROFILE_RELEASE_DEBUG=true \
     CARGO_PROFILE_RELEASE_STRIP=none \

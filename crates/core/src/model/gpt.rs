@@ -19,6 +19,8 @@ pub struct Gpt<EN: Engine> {
     pub blocks: Vec<Block<EN>>,
     pub final_norm: LayerNorm<EN>,
     pub language_head: Linear<EN>,
+    pub train_loss: f32,
+    pub validation_loss: f32,
 }
 
 pub struct GptCache<EN: Engine> {
@@ -53,6 +55,8 @@ impl<EN: Engine> Gpt<EN> {
 
         let final_norm = LayerNorm::new(en, c)?;
         let language_head = Linear::new(en, c, vocab_size, true, rng)?;
+        let train_loss = 0.0;
+        let validation_loss = 0.0;
 
         Ok(Self {
             blocks,
@@ -63,6 +67,8 @@ impl<EN: Engine> Gpt<EN> {
             config,
             vocab_size,
             tokenizer,
+            train_loss,
+            validation_loss,
         })
     }
 

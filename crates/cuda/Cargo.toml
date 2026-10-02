@@ -1,0 +1,20 @@
+[package]
+name = "ya-gpt-cuda"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+cudarc = { version = "0.19.10", default-features = false, features = [
+  "std",
+  "driver",
+  "cublas",
+  "nvrtc",
+  "dynamic-loading",
+  "cuda-version-from-build-system",
+] }
+ya-gpt = { path = "../core" }
+
+[dev-dependencies]
+rand.workspace = true

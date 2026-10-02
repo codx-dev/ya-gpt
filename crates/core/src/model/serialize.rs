@@ -8,13 +8,15 @@ use crate::{
     model::{Block, LayerNorm, Linear, Parameter, gpt::Gpt},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, MsgPacker)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, MsgPacker)]
 pub struct ModelHeader {
     pub name: String,
     pub authors: String,
     pub major: String,
     pub fp: String,
     pub params: usize,
+    pub train_loss: f32,
+    pub validation_loss: f32,
 }
 
 impl ModelHeader {
@@ -29,6 +31,8 @@ impl ModelHeader {
             major: Self::MAJOR.to_owned(),
             fp: Self::FP.to_owned(),
             params: model.parameter_count(en),
+            train_loss: model.train_loss,
+            validation_loss: model.validation_loss,
         }
     }
 
@@ -50,6 +54,8 @@ impl<EN: Engine> Gpt<EN> {
             blocks,
             final_norm,
             language_head,
+            train_loss,
+            validation_loss,
         } = self;
 
         let mut encoder_owned = Encoder::new();
@@ -70,6 +76,8 @@ impl<EN: Engine> Gpt<EN> {
 
         final_norm.pack_to_buffer(en, encoder)?;
         language_head.pack_to_buffer(en, encoder)?;
+        train_loss.pack(encoder);
+        validation_loss.pack(encoder);
 
         Ok(encoder_owned.into_inner())
     }
@@ -98,6 +106,8 @@ impl<EN: Engine> Gpt<EN> {
 
         let final_norm = LayerNorm::unpack_from_cursor(en, cursor)?;
         let language_head = Linear::unpack_from_cursor(en, cursor)?;
+        let train_loss = unpack_from_cursor(cursor)?;
+        let validation_loss = unpack_from_cursor(cursor)?;
 
         Ok(Self {
             config,
@@ -108,6 +118,8 @@ impl<EN: Engine> Gpt<EN> {
             blocks,
             final_norm,
             language_head,
+            train_loss,
+            validation_loss,
         })
     }
 }

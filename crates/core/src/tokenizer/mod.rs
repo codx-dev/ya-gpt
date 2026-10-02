@@ -52,7 +52,7 @@ impl Tokenizer {
 mod tests {
     use super::*;
 
-    const INPUT: &str = include_str!("../../../../data/input.txt");
+    const INPUT: &str = include_str!("../../../../data/tinyshakespeare.txt");
 
     #[test]
     fn alphabet_is_consistent() {

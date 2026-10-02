@@ -1,49 +1,58 @@
-# Yet Another GPT implementation
+# Yet Another GPT
 
 Yet another GPT implementation in pure Rust, with minimal dependencies and no ML frameworks.
 
-The main goal is to experiment with and compare the performance of different engine implementations. The model uses only self-attention; cross-attention is intentionally omitted to keep the implementation as simple as possible.
+The main goal is to experiment with and compare the performance of different engine implementations. The model uses only self-attention; cross-attention is intentionally omitted to keep the implementation as simple as possible. Supports training and text generation through a naive CPU, SIMD backend, and CUDA. We also use a char-stream fixed tokenizer to reduce the training workload.
 
-Supports training and text generation through a naive CPU or SIMD backend. CUDA backend is planned.
+This work is based on the foundational Transformer architecture introduced by [Vaswani et al. (2017)](https://arxiv.org/abs/1706.03762), and specifically builds on the decoder-only structure of the early GPT implementations pioneered by [Radford et al. (2018)](https://cdn.openai.com/research-covers/language-unsupervised/language_understanding_paper.pdf).
 
 This is *NOT* intended for production use.
 
-The model on `./assets/model-simd-wide-medium-5000.bin` was trained with the following command:
+### Models
+
+A model will start to perform reasonably with ~1.88 loss (cross-entropy). Any value greater than that will yield gibberish text for our Shakespeare input. If you don't have a GPU, you can achieve a fairly decent result (~1.6 loss) with a SIMD backend.
 
 ```
-# AMD EPYC 7402P 24-Core Processor
-$ time just train-simd-wide medium 5000
-RUSTFLAGS="-C target-cpu=native" cargo run --release -p ya-gpt-cli --features simd-wide -- train --engine simd-wide --preset medium --iterations 5000 --input data/input.txt --output ./out/model-simd-wide.bin
+# RTX 4500 ADA
+$ time just train-cuda 0 large 10000
 ..
-step 5000: train loss 1.4411, val loss 1.6158
-just train-simd-wide medium 5000  7345.51s user 0.48s system 99% cpu 2:03:02.69 total
+step 10000: train loss 0.8112, val loss 1.5552
+just train-cuda 0 large 10000  2166.29s user 592.70s system 99% cpu 46:11.70 total
 ```
 
-A model will start to perform reasonably with ~1.88 loss (cross-entropy)
-
-```sh
-$ cargo run -- inspect --input ./assets/model-simd-wide-medium-5000.bin | jq
+```
+$ cargo run -- inspect --pretty --input ./assets/model-shakespeare-large-10000.bin
 {
   "name": "ya-gpt",
   "authors": "Victor Lopez <vhrlopes@gmail.com>",
   "major": "0",
   "fp": "f32",
-  "params": 825154
+  "params": 4833858,
+  "train_loss": 0.8112385,
+  "validation_loss": 1.5552003
 }
 ```
 
-Here is the output of this medium performance model:
-
-```sh
-$ just generate-simd-wide 200 ./assets/model-simd-wide-medium-5000.bin 
+```
+$ just generate-cuda 0 250 ./assets/model-shakespeare-large-10000.bin
 ROMEO:
-So you dispity have the soul
-worthlenous to of Richard: I say be Richard:
-O, would by him say it not fortune hath long.
-Thoral'd this being himself are day to quarrels;
-To hear a fair harm that depae
+Nay, poor soul, will I leave your ship dry,
+To me to help you the discloud with a false peace!
+
+QUEEN ELIZABETH:
+Why, then, Catesby, I say, let the confound
+The rest rather of the Gloucester's pardon.
+
+KING RICHARD III:
+Well, my guiss, I would do th%                                                                                           
 ```
 
-Below is a flamegraph for preset small with 100 interactions, using the Naive backend:
+### Planned features
+
+- May introduce a miniBPE tokenizer. The goal of this repo is to be able to train models with a consumer grade GPU, but the self-attention quadratic sequence length fallout is a problem for char-stream tokenizers. miniBPE (1k-2k tokens vs 50k of standard BPE) will still be doable on a good desktop GPU (~12VRAM), but need to check the time to complete the train.
+
+### Profiling
+
+Below is a flamegraph for preset small with 100 interactions, using the Naive backend (better readability):
 
 ![Flamegraph](./images/flamegraph-small-100.svg)

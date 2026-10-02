@@ -175,6 +175,8 @@ impl<EN: Engine> AdamW<EN> {
         rng: &mut impl Rng,
     ) -> anyhow::Result<()> {
         let mut ws = EN::Workspace::default();
+        let step_loss = (self.iters / 4).max(1);
+        let mut step_loss_count = 0;
 
         for step in 1..=self.iters {
             let (inputs, targets) = self.get_batch(&self.train, rng);
@@ -191,11 +193,18 @@ impl<EN: Engine> AdamW<EN> {
 
             self.step(en, &mut model.parameters_mut())?;
 
-            if self.report_loss_per_step && step < self.iters {
-                self.report_loss(en, model, step, rng)?;
+            if step < self.iters {
+                if self.report_loss_per_step || step_loss_count == step_loss {
+                    self.report_loss(en, model, step, rng)?;
+                    step_loss_count = 0;
+                } else {
+                    eprintln!("step {step}");
+                }
             } else {
                 eprintln!("step {step}");
             }
+
+            step_loss_count += 1;
         }
 
         self.report_loss(en, model, self.iters, rng)?;
@@ -264,7 +273,7 @@ impl<EN: Engine> AdamW<EN> {
     fn report_loss(
         &self,
         en: &EN,
-        model: &Gpt<EN>,
+        model: &mut Gpt<EN>,
         step: usize,
         rng: &mut impl Rng,
     ) -> anyhow::Result<()> {
@@ -273,182 +282,9 @@ impl<EN: Engine> AdamW<EN> {
 
         eprintln!("step {step}: train loss {train:.4}, val loss {validation:.4}");
 
+        model.train_loss = train;
+        model.validation_loss = validation;
+
         Ok(())
     }
 }
-
-/*
-use rand::{Rng, RngExt as _};
-
-use crate::{
-    config::ModelConfig,
-    engine::{
-        Engine,
-        types::{AdamWConfig, AdamWGroup},
-    },
-    model::{gpt::Gpt, types::Parameter},
-    tokenizer::Tokenizer,
-};
-
-
-impl<EN: Engine> AdamW<EN> {
-
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::engine::naive::Naive;
-    use rand::{SeedableRng, rngs::StdRng};
-
-    fn fixture() -> (Gpt<Naive>, AdamW<Naive>) {
-        let config = ModelConfig::micro();
-        let tokenizer = Tokenizer::new("ab");
-        let mut model = Gpt::new(
-            &Naive,
-            config.clone(),
-            tokenizer.clone(),
-            &mut StdRng::seed_from_u64(42),
-        )
-        .unwrap();
-        let optimizer = AdamW::new(
-            &Naive,
-            &tokenizer,
-            &"ab".repeat(64),
-            &mut model,
-            config,
-            false,
-        )
-        .unwrap()
-        .with_learning_rate(0.1)
-        .with_weight_decay(0.2);
-
-        for parameter in model.parameters_mut() {
-            parameter.values.fill(1.0);
-            parameter.gradients.fill(2.0);
-        }
-        (model, optimizer)
-    }
-
-    #[test]
-    fn invalid_last_gradient_leaves_all_weights_moments_and_step_unchanged() {
-        for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
-            let (mut model, mut optimizer) = fixture();
-            model.parameters_mut().last_mut().unwrap().gradients[0] = invalid;
-
-            assert!(optimizer.step(&Naive, &mut model.parameters_mut()).is_err());
-
-            assert_eq!(optimizer.step, 0);
-            for parameter in model.parameters() {
-                assert!(parameter.values.iter().all(|value| *value == 1.0));
-            }
-            for moment in optimizer
-                .first_moment
-                .iter()
-                .chain(&optimizer.second_moment)
-            {
-                assert!(moment.iter().all(|value| *value == 0.0));
-            }
-        }
-    }
-
-    #[test]
-    fn invalid_parameter_and_shape_fail_before_any_update() {
-        for corrupt_shape in [false, true] {
-            let (mut model, mut optimizer) = fixture();
-            if corrupt_shape {
-                model.parameters_mut().last_mut().unwrap().gradients.pop();
-            } else {
-                model.parameters_mut().last_mut().unwrap().values[0] = f32::NAN;
-            }
-            let before: Vec<_> = model
-                .parameters()
-                .iter()
-                .map(|p| p.values.iter().map(|v| v.to_bits()).collect::<Vec<_>>())
-                .collect();
-            assert!(optimizer.step(&Naive, &mut model.parameters_mut()).is_err());
-            assert_eq!(optimizer.step, 0);
-            for (p, expected) in model.parameters().iter().zip(before) {
-                assert_eq!(
-                    p.values.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
-                    expected
-                );
-            }
-            assert!(
-                optimizer
-                    .first_moment
-                    .iter()
-                    .chain(&optimizer.second_moment)
-                    .flatten()
-                    .all(|&v| v == 0.0)
-            );
-        }
-    }
-
-    #[test]
-    fn step_updates_weights_and_moments_without_replacing_buffers() {
-        let (mut model, mut optimizer) = fixture();
-        let pointers: Vec<_> = model
-            .parameters()
-            .iter()
-            .map(|parameter| parameter.values.as_ptr())
-            .collect();
-        let first_pointers: Vec<_> = optimizer.first_moment.iter().map(|m| m.as_ptr()).collect();
-        let second_pointers: Vec<_> = optimizer.second_moment.iter().map(|m| m.as_ptr()).collect();
-
-        optimizer.step(&Naive, &mut model.parameters_mut()).unwrap();
-
-        assert_eq!(optimizer.step, 1);
-        let expected = 0.98 - 0.1 * 2.0 / (2.0 + 1e-8);
-        for (index, parameter) in model.parameters().iter().enumerate() {
-            assert_eq!(parameter.values.as_ptr(), pointers[index]);
-            assert_eq!(
-                optimizer.first_moment[index].as_ptr(),
-                first_pointers[index]
-            );
-            assert_eq!(
-                optimizer.second_moment[index].as_ptr(),
-                second_pointers[index]
-            );
-            assert_eq!(parameter.values.len(), optimizer.first_moment[index].len());
-            assert_eq!(parameter.values.len(), optimizer.second_moment[index].len());
-            assert!(
-                parameter
-                    .values
-                    .iter()
-                    .all(|value| (value - expected).abs() < 2e-5)
-            );
-            assert!(parameter.gradients.iter().all(|gradient| *gradient == 2.0));
-            assert!(
-                optimizer.first_moment[index]
-                    .iter()
-                    .all(|m| (m - 0.2).abs() < 2e-5)
-            );
-            assert!(
-                optimizer.second_moment[index]
-                    .iter()
-                    .all(|v| (v - 0.004).abs() < 2e-5)
-            );
-        }
-    }
-
-    #[test]
-    fn step_counter_still_saturates() {
-        let (mut model, mut optimizer) = fixture();
-        optimizer.step = i32::MAX;
-
-        optimizer.step(&Naive, &mut model.parameters_mut()).unwrap();
-
-        assert_eq!(optimizer.step, i32::MAX);
-        let expected = 0.98 - 0.1 * 0.2 / (0.004_f32.sqrt() + 1e-8);
-        for parameter in model.parameters() {
-            assert!(
-                parameter
-                    .values
-                    .iter()
-                    .all(|value| (value - expected).abs() < 2e-5)
-            );
-        }
-    }
-}
-*/
