@@ -4,28 +4,44 @@ Yet another GPT implementation in pure Rust, with minimal dependencies and no ML
 
 The main goal is to experiment with and compare the performance of different engine implementations. The model uses only self-attention; cross-attention is intentionally omitted to keep the implementation as simple as possible.
 
-Supports training and text generation through a naive CPU backend. CUDA and SIMD backends are planned.
+Supports training and text generation through a naive CPU or SIMD backend. CUDA backend is planned.
 
 This is *NOT* intended for production use.
 
-```sh
+The model on `./assets/model-simd-wide-medium-5000.bin` was trained with the following command:
+
+```
 # AMD EPYC 7402P 24-Core Processor
-$ time just train-simd-wide medium 500
+$ time just train-simd-wide medium 5000
+RUSTFLAGS="-C target-cpu=native" cargo run --release -p ya-gpt-cli --features simd-wide -- train --engine simd-wide --preset medium --iterations 5000 --input data/input.txt --output ./out/model-simd-wide.bin
 ..
-step 500: train loss 2.3079, val loss 2.3360
-just train-simd-wide medium 500  703.11s user 0.30s system 99% cpu 11:46.02 total
+step 5000: train loss 1.4411, val loss 1.6158
+just train-simd-wide medium 5000  7345.51s user 0.48s system 99% cpu 2:03:02.69 total
+```
 
-$ cargo run -- inspect --input ./out/model-simd-wide.bin
-{"name":"ya-gpt","authors":"Victor Lopez <vhrlopes@gmail.com>","major":"0","fp":"f32","params":825154}
+A model will start to perform reasonably with ~1.88 loss (cross-entropy)
 
-# a ~1.88 loss would yield some decent output, but requires more training
-$ time just generate-simd-wide
+```sh
+$ cargo run -- inspect --input ./assets/model-simd-wide-medium-5000.bin | jq
+{
+  "name": "ya-gpt",
+  "authors": "Victor Lopez <vhrlopes@gmail.com>",
+  "major": "0",
+  "fp": "f32",
+  "params": 825154
+}
+```
+
+Here is the output of this medium performance model:
+
+```sh
+$ just generate-simd-wide 200 ./assets/model-simd-wide-medium-5000.bin 
 ROMEO:
-Arf my; yoou youlls e thige I nco to mpno the,
-The sy n he asande nd is hes, by arist tondss,
-Me kerer naded, d
-..
-just generate-simd-wide  16.26s user 0.17s system 99% cpu 16.493 total
+So you dispity have the soul
+worthlenous to of Richard: I say be Richard:
+O, would by him say it not fortune hath long.
+Thoral'd this being himself are day to quarrels;
+To hear a fair harm that depae
 ```
 
 Below is a flamegraph for preset small with 100 interactions, using the Naive backend:
