@@ -12,3 +12,7 @@ This is *NOT* intended for production use.
 cargo run --release -- train --preset tiny --input data/input.txt --output out/model-tiny
 cargo run --release -- generate --input out/model-tiny --num-tokens 128 "Hello"
 ```
+
+Below is a flamegraph for preset small with 100 interactions, using the Naive backen:
+
+![Flamegraph](./images/flamegraph-small-100.svg)
