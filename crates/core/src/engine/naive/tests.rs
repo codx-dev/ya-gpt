@@ -1,3 +1,5 @@
+use alloc::{vec, vec::Vec};
+
 use super::{Naive, NaiveBlockCache, NaiveLayerNormCache};
 use crate::engine::{BlockSpec, ForwardMode, LinearSpec, NormSpec, NormWeights};
 

@@ -18,7 +18,8 @@ strip = true
 [workspace.dependencies]
 anyhow = "1.0.104"
 clap = "4.6.7"
-msgpacker = "0.7.1"
+libm = "0.2.16"
+msgpacker = { version = "0.7.2", features = ["derive"] }
 rand = "0.10.3"
 rand_distr = "0.6.0"
 serde = { version = "1.0.229", features = ["derive"] }

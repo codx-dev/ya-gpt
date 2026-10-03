@@ -1,3 +1,4 @@
+use alloc::{vec, vec::Vec};
 use rand::Rng;
 use rand_distr::{Distribution as _, Normal};
 
@@ -23,7 +24,8 @@ impl<EN: Engine> Parameter<EN> {
     }
 
     pub fn normal(en: &EN, len: usize, rng: &mut impl Rng) -> anyhow::Result<Self> {
-        let normal = Normal::<f32>::new(0.0, 0.02)?;
+        let normal = Normal::<f32>::new(0.0, 0.02)
+            .map_err(|e| anyhow::anyhow!("distribution error: {e}"))?;
         let values: Vec<f32> = (0..len).map(|_| normal.sample(rng)).collect();
         let values = en.buffer_from_slice(&values)?;
         let gradients = en.zeroes(len)?;

@@ -1,5 +1,6 @@
-use std::mem;
+use core::mem;
 
+use alloc::{vec, vec::Vec};
 use anyhow::Context as _;
 use rand::{Rng, RngExt as _};
 
@@ -244,18 +245,10 @@ impl<EN: Engine> Gpt<EN> {
         batch: usize,
         time: usize,
         workspace: &mut EN::Workspace,
+        rng: &mut impl Rng,
     ) -> anyhow::Result<EN::Buffer> {
-        self.run_forward(
-            en,
-            tokens,
-            batch,
-            time,
-            false,
-            false,
-            &mut rand::rng(),
-            workspace,
-        )
-        .map(|(logits, _)| logits)
+        self.run_forward(en, tokens, batch, time, false, false, rng, workspace)
+            .map(|(logits, _)| logits)
     }
 
     pub fn forward(
@@ -264,8 +257,9 @@ impl<EN: Engine> Gpt<EN> {
         tokens: &[usize],
         batch: usize,
         time: usize,
+        rng: &mut impl Rng,
     ) -> anyhow::Result<EN::Buffer> {
-        self.forward_inference(en, tokens, batch, time, &mut EN::Workspace::default())
+        self.forward_inference(en, tokens, batch, time, &mut EN::Workspace::default(), rng)
     }
 
     pub fn backward_with_workspace(
@@ -413,7 +407,8 @@ impl<EN: Engine> Gpt<EN> {
             let start = tokens.len().saturating_sub(self.config.block_size);
             let context = &tokens[start..];
 
-            let logits = self.forward_inference(en, context, 1, context.len(), &mut workspace)?;
+            let logits =
+                self.forward_inference(en, context, 1, context.len(), &mut workspace, rng)?;
             let rnd = rng.random();
             let token = en.sample_last_token(&logits, context.len(), self.vocab_size, rnd)?;
 

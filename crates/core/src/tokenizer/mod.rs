@@ -1,6 +1,9 @@
-use std::{
-    collections::{BTreeSet, HashMap},
-    iter,
+use core::iter;
+
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    string::String,
+    vec::Vec,
 };
 
 use msgpacker::MsgPacker;
@@ -8,7 +11,7 @@ use msgpacker::MsgPacker;
 #[derive(Debug, Clone, PartialEq, Eq, MsgPacker)]
 pub struct Tokenizer {
     pub chars: Vec<char>,
-    pub char_to_idx: HashMap<char, usize>,
+    pub char_to_idx: BTreeMap<char, usize>,
 }
 
 impl Tokenizer {

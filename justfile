@@ -11,6 +11,7 @@ check-clippy:
 
 check-test:
   cargo test --workspace --exclude ya-gpt-cuda
+  cargo hack -p ya-gpt test --feature-powerset
 
 check-doc:
   RUSTDOCFLAGS="-D warnings" cargo doc --workspace --exclude ya-gpt-cuda --no-deps
@@ -21,6 +22,11 @@ check-features:
     --workspace --exclude ya-gpt-cuda \
     --feature-powerset \
     --exclude-features cuda,ya-gpt-cuda \
+    --no-dev-deps
+  RUSTFLAGS="-D warnings" cargo hack -p ya-gpt check \
+    --target thumbv7em-none-eabi \
+    --feature-powerset \
+    --exclude-features std,default,clap \
     --no-dev-deps
 
 train-and-run prompt="The foundation is:":
@@ -91,4 +97,3 @@ flamegraph preset="tiny" iterations="100" input="data/shakespeare.txt" output=".
       --input {{input}} \
       --output {{output}}
   wc -c < {{output}} | numfmt --to=iec-i --suffix=B
-

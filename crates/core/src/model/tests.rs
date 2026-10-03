@@ -1,7 +1,11 @@
-use super::{gpt::Gpt, optimizer::AdamW, types::Parameter};
+use core::cell;
+
+use alloc::{vec, vec::Vec};
+
 use crate::{
     config::ModelConfig,
     engine::{naive::Naive, *},
+    model::{gpt::Gpt, optimizer::AdamW, types::Parameter},
     tokenizer::Tokenizer,
 };
 use rand::{RngExt, SeedableRng, rngs::StdRng};
@@ -35,7 +39,9 @@ fn initialization_and_disabled_dropout_are_reproducible() {
         .forward_with_cache(&Naive, &[0, 1, 2, 0], 1, 4, true, &mut source)
         .unwrap();
     assert_eq!(source.random::<u64>(), untouched.random::<u64>());
-    let inference = gpt.forward(&Naive, &[0, 1, 2, 0], 1, 4).unwrap();
+    let inference = gpt
+        .forward(&Naive, &[0, 1, 2, 0], 1, 4, &mut rng())
+        .unwrap();
     close(&cached, &inference, 0.);
     let mut config = ModelConfig::micro();
     config.dropout = 0.4;
@@ -67,7 +73,7 @@ fn complete_model_gradients_match_finite_differences() {
             gpt.parameters_mut()[p].values[index] = original + h;
             let plus = Naive
                 .cross_entropy(
-                    &gpt.forward(&Naive, &tokens, 2, 2).unwrap(),
+                    &gpt.forward(&Naive, &tokens, 2, 2, &mut rng()).unwrap(),
                     &targets.to_vec(),
                     4,
                     gpt.vocab_size,
@@ -76,7 +82,7 @@ fn complete_model_gradients_match_finite_differences() {
             gpt.parameters_mut()[p].values[index] = original - h;
             let minus = Naive
                 .cross_entropy(
-                    &gpt.forward(&Naive, &tokens, 2, 2).unwrap(),
+                    &gpt.forward(&Naive, &tokens, 2, 2, &mut rng()).unwrap(),
                     &targets.to_vec(),
                     4,
                     gpt.vocab_size,
@@ -154,13 +160,13 @@ fn gradients_reuse_allocations_and_training_reduces_loss() {
 /// This engine makes accidental device-to-host bulk reads fail immediately.
 #[derive(Default)]
 struct Tracked {
-    forward: std::cell::Cell<usize>,
-    backward: std::cell::Cell<usize>,
-    saved: std::cell::Cell<usize>,
-    norm_saved: std::cell::Cell<usize>,
-    uploads: std::cell::Cell<usize>,
-    validations: std::cell::Cell<usize>,
-    samples: std::cell::Cell<usize>,
+    forward: cell::Cell<usize>,
+    backward: cell::Cell<usize>,
+    saved: cell::Cell<usize>,
+    norm_saved: cell::Cell<usize>,
+    uploads: cell::Cell<usize>,
+    validations: cell::Cell<usize>,
+    samples: cell::Cell<usize>,
 }
 macro_rules! delegate {
     ($(fn $name:ident(&self $(, $arg:ident : $ty:ty)*) -> $ret:ty; )*) => {

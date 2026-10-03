@@ -938,8 +938,8 @@ fn complete_model_parity_training_generation_and_serialization() {
     let tokens = [0, 1, 2, 0];
     let targets = [1, 2, 0, 1];
     close(
-        &download(&en, &model.forward(&en, &tokens, 2, 2).unwrap()),
-        &cpu.forward(&Naive, &tokens, 2, 2).unwrap(),
+        &download(&en, &model.forward(&en, &tokens, 2, 2, &mut rng()).unwrap()),
+        &cpu.forward(&Naive, &tokens, 2, 2, &mut rng()).unwrap(),
         2e-4,
     );
     let cpu_loss = cpu
@@ -979,7 +979,7 @@ fn complete_model_parity_training_generation_and_serialization() {
     }
     let final_loss = en
         .cross_entropy(
-            &model.forward(&en, &tokens, 2, 2).unwrap(),
+            &model.forward(&en, &tokens, 2, 2, &mut rng()).unwrap(),
             &en.indices_from_slice(&targets).unwrap(),
             4,
             model.vocab_size,
@@ -995,8 +995,8 @@ fn complete_model_parity_training_generation_and_serialization() {
     let restored = Gpt::try_from_bytes(&Naive, &model.to_bytes(&en).unwrap()).unwrap();
     assert_same_model(&en, &model, &Naive, &restored);
     close(
-        &restored.forward(&Naive, &tokens, 2, 2).unwrap(),
-        &download(&en, &model.forward(&en, &tokens, 2, 2).unwrap()),
+        &restored.forward(&Naive, &tokens, 2, 2, &mut rng()).unwrap(),
+        &download(&en, &model.forward(&en, &tokens, 2, 2, &mut rng()).unwrap()),
         3e-4,
     );
 }

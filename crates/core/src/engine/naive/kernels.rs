@@ -1,8 +1,12 @@
+use alloc::vec::Vec;
 use rand::{RngExt as _, SeedableRng as _, rngs::StdRng};
 
-use crate::engine::{
-    BlockSpec, ForwardMode, LinearSpec, NormSpec, NormWeights,
-    naive::{Naive, NaiveBlockCache, NaiveLayerNormCache},
+use crate::{
+    engine::{
+        BlockSpec, ForwardMode, LinearSpec, NormSpec, NormWeights,
+        naive::{Naive, NaiveBlockCache, NaiveLayerNormCache},
+    },
+    utils,
 };
 
 impl Naive {
@@ -84,7 +88,7 @@ impl Naive {
             let mean = values.iter().sum::<f32>() / s.channels as f32;
             let variance =
                 values.iter().map(|v| (v - mean) * (v - mean)).sum::<f32>() / s.channels as f32;
-            let inv = 1.0 / (variance + s.epsilon).sqrt();
+            let inv = 1.0 / utils::sqrtf(variance + s.epsilon);
 
             for ch in 0..s.channels {
                 let normalized = (values[ch] - mean) * inv;
@@ -200,7 +204,7 @@ impl Naive {
     ) {
         let c = s.channels;
         let d = c / s.heads;
-        let scale = 1.0 / (d as f32).sqrt();
+        let scale = 1.0 / utils::sqrtf(d as f32);
 
         let mut rng = Self::dropout_rng(mode, s.dropout, 0);
 
@@ -239,7 +243,7 @@ impl Naive {
                     }
 
                     for score in &mut scores[..=t] {
-                        *score = (*score - max).exp();
+                        *score = utils::expf(*score - max);
                         total += *score;
                     }
 
@@ -278,7 +282,7 @@ impl Naive {
     ) {
         let c = s.channels;
         let d = c / s.heads;
-        let scale = 1.0 / (d as f32).sqrt();
+        let scale = 1.0 / utils::sqrtf(d as f32);
 
         dqkv.fill(0.0);
 
@@ -337,13 +341,13 @@ impl Naive {
 
         for (r, row) in logits.chunks_exact(vocab).enumerate() {
             let max = row.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-            let total: f32 = row.iter().map(|v| (v - max).exp()).sum();
+            let total: f32 = row.iter().map(|v| utils::expf(v - max)).sum();
 
-            loss += ((max - row[targets[r]]) + total.ln()) * scale;
+            loss += ((max - row[targets[r]]) + utils::logf(total)) * scale;
 
             if let Some(g) = gradient.as_deref_mut() {
                 for j in 0..vocab {
-                    let arg = (row[j] - max).exp() / total;
+                    let arg = utils::expf(row[j] - max) / total;
 
                     g[r * vocab + j] = (arg - f32::from(j == targets[r])) * scale;
                 }

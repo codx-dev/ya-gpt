@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use crate::engine::{BlockSpec, NormSpec};
 
 #[derive(Default)]

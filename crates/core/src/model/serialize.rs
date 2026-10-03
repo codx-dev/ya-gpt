@@ -1,6 +1,8 @@
-use std::io;
-
-use msgpacker::{BufMut, Encoder, MsgPacker, Packable as _, Unpackable};
+use alloc::{
+    string::{String, ToString as _},
+    vec::Vec,
+};
+use msgpacker::{BufMut, Encoder, MsgPacker, Packable as _};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -26,10 +28,10 @@ impl ModelHeader {
 
     pub fn from_model<EN: Engine>(en: &EN, model: &Gpt<EN>) -> Self {
         Self {
-            name: Self::NAME.to_owned(),
-            authors: env!("CARGO_PKG_AUTHORS").to_owned(),
-            major: Self::MAJOR.to_owned(),
-            fp: Self::FP.to_owned(),
+            name: Self::NAME.to_string(),
+            authors: env!("CARGO_PKG_AUTHORS").to_string(),
+            major: Self::MAJOR.to_string(),
+            fp: Self::FP.to_string(),
             params: model.parameter_count(en),
             train_loss: model.train_loss,
             validation_loss: model.validation_loss,
@@ -82,32 +84,32 @@ impl<EN: Engine> Gpt<EN> {
         Ok(encoder_owned.into_inner())
     }
 
-    pub fn header_from_bytes(bytes: &[u8]) -> anyhow::Result<ModelHeader> {
-        unpack_from_cursor(&mut io::Cursor::new(bytes))
+    pub fn header_from_bytes(mut bytes: &[u8]) -> anyhow::Result<ModelHeader> {
+        Ok(msgpacker::unpack_from_buf(&mut bytes)?)
     }
 
-    pub fn try_from_bytes(en: &EN, bytes: &[u8]) -> anyhow::Result<Self> {
-        let cursor = &mut io::Cursor::new(bytes);
+    pub fn try_from_bytes(en: &EN, mut bytes: &[u8]) -> anyhow::Result<Self> {
+        let cursor = &mut bytes;
 
-        let header: ModelHeader = unpack_from_cursor(cursor)?;
+        let header: ModelHeader = msgpacker::unpack_from_buf(cursor)?;
 
         anyhow::ensure!(header.is_current(), "model header mismatch");
 
-        let config = unpack_from_cursor(cursor)?;
-        let vocab_size = unpack_from_cursor(cursor)?;
-        let tokenizer = unpack_from_cursor(cursor)?;
-        let token_embedding = Parameter::unpack_from_cursor(en, cursor)?;
-        let position_embedding = Parameter::unpack_from_cursor(en, cursor)?;
+        let config = msgpacker::unpack_from_buf(cursor)?;
+        let vocab_size = msgpacker::unpack_from_buf(cursor)?;
+        let tokenizer = msgpacker::unpack_from_buf(cursor)?;
+        let token_embedding = Parameter::unpack_from_buf(en, cursor)?;
+        let position_embedding = Parameter::unpack_from_buf(en, cursor)?;
 
-        let blocks: u64 = unpack_from_cursor(cursor)?;
+        let blocks: u64 = msgpacker::unpack_from_buf(cursor)?;
         let blocks = (0..blocks)
-            .map(|_| Block::unpack_from_cursor(en, cursor))
+            .map(|_| Block::unpack_from_buf(en, cursor))
             .collect::<anyhow::Result<Vec<_>>>()?;
 
-        let final_norm = LayerNorm::unpack_from_cursor(en, cursor)?;
-        let language_head = Linear::unpack_from_cursor(en, cursor)?;
-        let train_loss = unpack_from_cursor(cursor)?;
-        let validation_loss = unpack_from_cursor(cursor)?;
+        let final_norm = LayerNorm::unpack_from_buf(en, cursor)?;
+        let language_head = Linear::unpack_from_buf(en, cursor)?;
+        let train_loss = msgpacker::unpack_from_buf(cursor)?;
+        let validation_loss = msgpacker::unpack_from_buf(cursor)?;
 
         Ok(Self {
             config,
@@ -134,9 +136,9 @@ impl<EN: Engine> Parameter<EN> {
         Ok(())
     }
 
-    pub fn unpack_from_cursor(en: &EN, cursor: &mut io::Cursor<&[u8]>) -> anyhow::Result<Self> {
-        let values: Vec<f32> = unpack_from_cursor(cursor)?;
-        let gradients: Vec<f32> = unpack_from_cursor(cursor)?;
+    pub fn unpack_from_buf(en: &EN, cursor: &mut &[u8]) -> anyhow::Result<Self> {
+        let values: Vec<f32> = msgpacker::unpack_from_buf(cursor)?;
+        let gradients: Vec<f32> = msgpacker::unpack_from_buf(cursor)?;
 
         let values = en.buffer_from_slice(&values)?;
         let gradients = en.buffer_from_slice(&gradients)?;
@@ -155,9 +157,9 @@ impl<EN: Engine> LayerNorm<EN> {
         Ok(())
     }
 
-    pub fn unpack_from_cursor(en: &EN, cursor: &mut io::Cursor<&[u8]>) -> anyhow::Result<Self> {
-        let gamma = Parameter::unpack_from_cursor(en, cursor)?;
-        let beta = Parameter::unpack_from_cursor(en, cursor)?;
+    pub fn unpack_from_buf(en: &EN, cursor: &mut &[u8]) -> anyhow::Result<Self> {
+        let gamma = Parameter::unpack_from_buf(en, cursor)?;
+        let beta = Parameter::unpack_from_buf(en, cursor)?;
 
         Ok(Self { gamma, beta })
     }
@@ -186,13 +188,13 @@ impl<EN: Engine> Linear<EN> {
         Ok(())
     }
 
-    pub fn unpack_from_cursor(en: &EN, cursor: &mut io::Cursor<&[u8]>) -> anyhow::Result<Self> {
-        let weight = Parameter::unpack_from_cursor(en, cursor)?;
-        let bias = unpack_from_cursor::<bool>(cursor)?
-            .then(|| Parameter::unpack_from_cursor(en, cursor))
+    pub fn unpack_from_buf(en: &EN, cursor: &mut &[u8]) -> anyhow::Result<Self> {
+        let weight = Parameter::unpack_from_buf(en, cursor)?;
+        let bias = msgpacker::unpack_from_buf::<_, bool>(cursor)?
+            .then(|| Parameter::unpack_from_buf(en, cursor))
             .transpose()?;
-        let input_size = unpack_from_cursor(cursor)?;
-        let output_size = unpack_from_cursor(cursor)?;
+        let input_size = msgpacker::unpack_from_buf(cursor)?;
+        let output_size = msgpacker::unpack_from_buf(cursor)?;
 
         Ok(Self {
             weight,
@@ -224,13 +226,13 @@ impl<EN: Engine> Block<EN> {
         Ok(())
     }
 
-    pub fn unpack_from_cursor(en: &EN, cursor: &mut io::Cursor<&[u8]>) -> anyhow::Result<Self> {
-        let norm1 = LayerNorm::unpack_from_cursor(en, cursor)?;
-        let qkv = Parameter::unpack_from_cursor(en, cursor)?;
-        let attention = Linear::unpack_from_cursor(en, cursor)?;
-        let norm2 = LayerNorm::unpack_from_cursor(en, cursor)?;
-        let expand = Linear::unpack_from_cursor(en, cursor)?;
-        let project = Linear::unpack_from_cursor(en, cursor)?;
+    pub fn unpack_from_buf(en: &EN, cursor: &mut &[u8]) -> anyhow::Result<Self> {
+        let norm1 = LayerNorm::unpack_from_buf(en, cursor)?;
+        let qkv = Parameter::unpack_from_buf(en, cursor)?;
+        let attention = Linear::unpack_from_buf(en, cursor)?;
+        let norm2 = LayerNorm::unpack_from_buf(en, cursor)?;
+        let expand = Linear::unpack_from_buf(en, cursor)?;
+        let project = Linear::unpack_from_buf(en, cursor)?;
 
         Ok(Self {
             norm1,
@@ -241,16 +243,4 @@ impl<EN: Engine> Block<EN> {
             project,
         })
     }
-}
-
-fn unpack_from_cursor<T: Unpackable<Error = msgpacker::Error>>(
-    cursor: &mut io::Cursor<&[u8]>,
-) -> anyhow::Result<T> {
-    let pos = (cursor.position() as usize).min(cursor.get_ref().len());
-    let remaining = &cursor.get_ref()[pos..];
-    let (n, values): (_, T) = Unpackable::unpack_with_ofs(remaining)?;
-
-    cursor.set_position((pos + n) as u64);
-
-    Ok(values)
 }

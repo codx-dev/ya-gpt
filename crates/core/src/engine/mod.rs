@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 mod types;
 
 pub mod naive;

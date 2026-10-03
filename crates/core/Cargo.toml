@@ -5,13 +5,32 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-anyhow.workspace = true
+anyhow = { workspace = true, default-features = false }
 clap = { workspace = true, optional = true, features = ["derive"] }
-msgpacker.workspace = true
+libm.workspace = true
+msgpacker = { workspace = true, default-features = false }
+rand = { workspace = true, default-features = false, features = [
+  "alloc",
+  "std_rng",
+] }
+rand_distr = { workspace = true, default-features = false, features = [
+  "alloc",
+] }
+serde = { workspace = true, default-features = false, features = ["alloc"] }
+wide = { workspace = true, default-features = false, optional = true }
+
+[dev-dependencies]
 rand.workspace = true
-rand_distr.workspace = true
-serde.workspace = true
-wide = { workspace = true, optional = true }
 
 [features]
+default = ["std"]
+clap = ["dep:clap", "std"]
 simd-wide = ["wide"]
+std = [
+  "anyhow/default",
+  "msgpacker/default",
+  "rand/default",
+  "rand_distr/default",
+  "serde/default",
+  "wide?/default",
+]

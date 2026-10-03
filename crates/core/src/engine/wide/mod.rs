@@ -1,4 +1,4 @@
-//! Portable CPU kernels using eight-lane SIMD and scalar remainders.
+use alloc::{vec, vec::Vec};
 
 mod kernels;
 mod types;

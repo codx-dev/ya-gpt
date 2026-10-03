@@ -189,9 +189,9 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "libc"
-version = "0.2.189"
+version = "0.2.190"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
+checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
 
 [[package]]
 name = "libloading"
@@ -217,9 +217,9 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "msgpacker"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "362516e5c4eaad307666fc4d8927c23f7948f9cd527dab5c0fbd3b51a4a5733a"
+checksum = "c5c0ac43666318ea49105bbc10246a9609d9a5a20b6c2d2f934b32d19e685bf5"
 dependencies = [
  "bytes",
  "msgpacker-derive",
@@ -427,6 +427,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "libm",
  "msgpacker",
  "rand",
  "rand_distr",

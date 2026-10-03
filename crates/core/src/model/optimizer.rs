@@ -1,3 +1,4 @@
+use alloc::{format, string::String, vec::Vec};
 use rand::{Rng, RngExt as _};
 
 use crate::{
@@ -7,7 +8,7 @@ use crate::{
     tokenizer::Tokenizer,
 };
 
-pub struct AdamW<EN: Engine> {
+pub struct AdamW<EN: Engine, R: Reporter> {
     pub learning_rate: f32,
     pub weight_decay: f32,
     pub batch_size: usize,
@@ -19,9 +20,10 @@ pub struct AdamW<EN: Engine> {
     pub second_moment: Vec<EN::Buffer>,
     pub train: Vec<usize>,
     pub validation: Vec<usize>,
+    pub reporter: R,
 }
 
-impl<EN: Engine> AdamW<EN> {
+impl<EN: Engine> AdamW<EN, BasicReporter> {
     pub fn new(
         en: &EN,
         tokenizer: &Tokenizer,
@@ -39,6 +41,7 @@ impl<EN: Engine> AdamW<EN> {
         let batch_size = 4;
         let step = 0;
         let iters = 1000;
+        let reporter = BasicReporter;
 
         let first_moment = model
             .parameters()
@@ -64,7 +67,42 @@ impl<EN: Engine> AdamW<EN> {
             validation,
             first_moment,
             second_moment,
+            reporter,
         })
+    }
+}
+
+impl<EN: Engine, R: Reporter> AdamW<EN, R> {
+    pub fn with_reporter<RR: Reporter>(self, reporter: RR) -> AdamW<EN, RR> {
+        let Self {
+            learning_rate,
+            weight_decay,
+            batch_size,
+            config,
+            iters,
+            report_loss_per_step,
+            step,
+            first_moment,
+            second_moment,
+            train,
+            validation,
+            ..
+        } = self;
+
+        AdamW {
+            learning_rate,
+            weight_decay,
+            batch_size,
+            config,
+            iters,
+            report_loss_per_step,
+            step,
+            first_moment,
+            second_moment,
+            train,
+            validation,
+            reporter,
+        }
     }
 
     pub fn with_batch_size(mut self, batch_size: usize) -> Self {
@@ -198,10 +236,10 @@ impl<EN: Engine> AdamW<EN> {
                     self.report_loss(en, model, step, rng)?;
                     step_loss_count = 0;
                 } else {
-                    eprintln!("step {step}");
+                    self.reporter.report(format!("step {step}"));
                 }
             } else {
-                eprintln!("step {step}");
+                self.reporter.report(format!("step {step}"));
             }
 
             step_loss_count += 1;
@@ -249,6 +287,7 @@ impl<EN: Engine> AdamW<EN> {
                 self.batch_size,
                 self.config.block_size,
                 &mut ws,
+                rng,
             )?;
             let targets = en.indices_from_slice(&targets)?;
 
@@ -279,12 +318,27 @@ impl<EN: Engine> AdamW<EN> {
     ) -> anyhow::Result<()> {
         let train = self.estimate_loss(en, model, &self.train, rng)?;
         let validation = self.estimate_loss(en, model, &self.validation, rng)?;
+        let report = format!("step {step}: train loss {train:.4}, val loss {validation:.4}");
 
-        eprintln!("step {step}: train loss {train:.4}, val loss {validation:.4}");
+        self.reporter.report(report);
 
         model.train_loss = train;
         model.validation_loss = validation;
 
         Ok(())
+    }
+}
+
+pub trait Reporter {
+    fn report(&self, text: String);
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct BasicReporter;
+
+impl Reporter for BasicReporter {
+    fn report(&self, _text: String) {
+        #[cfg(feature = "std")]
+        eprintln!("{_text}");
     }
 }

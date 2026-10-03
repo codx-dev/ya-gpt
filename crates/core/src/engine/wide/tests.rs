@@ -1,3 +1,4 @@
+use alloc::{vec, vec::Vec};
 use rand::{SeedableRng as _, rngs::StdRng};
 
 use super::{SimdWide, SimdWideBlockCache, SimdWideLayerNormCache, SimdWideWorkspace};
@@ -800,16 +801,18 @@ fn models_match_and_checkpoints_work_across_backends() {
     let loaded = Gpt::try_from_bytes(&SimdWide, &bytes).unwrap();
     assert_eq!(loaded.to_bytes(&SimdWide).unwrap(), bytes);
     close(
-        &loaded.forward(&SimdWide, &tokens, 2, 9).unwrap(),
-        &naive.forward(&Naive, &tokens, 2, 9).unwrap(),
+        &loaded
+            .forward(&SimdWide, &tokens, 2, 9, &mut rng())
+            .unwrap(),
+        &naive.forward(&Naive, &tokens, 2, 9, &mut rng()).unwrap(),
         1e-4,
     );
     let bytes = wide.to_bytes(&SimdWide).unwrap();
     let loaded = Gpt::try_from_bytes(&Naive, &bytes).unwrap();
     assert_eq!(loaded.to_bytes(&Naive).unwrap(), bytes);
     close(
-        &loaded.forward(&Naive, &tokens, 2, 9).unwrap(),
-        &wide.forward(&SimdWide, &tokens, 2, 9).unwrap(),
+        &loaded.forward(&Naive, &tokens, 2, 9, &mut rng()).unwrap(),
+        &wide.forward(&SimdWide, &tokens, 2, 9, &mut rng()).unwrap(),
         1e-4,
     );
 }
@@ -872,8 +875,10 @@ fn training_reduces_loss_and_reuses_parameter_allocations() {
 
 #[test]
 #[ignore = "manual release-mode timing; run with --release --ignored --nocapture"]
+#[cfg(feature = "std")]
 fn time_linear_kernels() {
     use std::{hint::black_box, time::Instant};
+
     fn measure<E: Engine<Buffer = Vec<f32>>>(
         engine: &E,
         spec: LinearSpec,
@@ -958,6 +963,7 @@ fn time_linear_kernels() {
         };
         let naive = measure(&Naive, spec);
         let wide = measure(&SimdWide, spec);
+
         eprintln!("{spec:?}: naive forward/backward {naive:?}, wide {wide:?}");
     }
 }

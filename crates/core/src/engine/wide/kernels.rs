@@ -1,9 +1,13 @@
 use ::wide::f32x8;
+use alloc::vec::Vec;
 use rand::{RngExt as _, SeedableRng as _, rngs::StdRng};
 
-use super::{SimdWide, SimdWideBlockCache, SimdWideLayerNormCache};
-use crate::engine::{
-    AdamWConfig, AdamWGroup, BlockSpec, ForwardMode, LinearSpec, NormSpec, NormWeights,
+use crate::{
+    engine::{
+        AdamWConfig, AdamWGroup, BlockSpec, ForwardMode, LinearSpec, NormSpec, NormWeights,
+        wide::{SimdWide, SimdWideBlockCache, SimdWideLayerNormCache},
+    },
+    utils,
 };
 
 const LANES: usize = 8;
@@ -132,13 +136,13 @@ impl SimdWide {
             if shifted.simd_lt(f32x8::splat(-80.0)).any() {
                 for (out, x) in result.iter_mut().zip(shifted.to_array()) {
                     if x < -80.0 {
-                        *out = x.exp();
+                        *out = utils::expf(x);
                     }
                 }
             }
         } else {
             for (out, &x) in result.iter_mut().zip(values) {
-                *out = (x - max).exp();
+                *out = utils::expf(x - max);
             }
         }
         result
@@ -153,7 +157,7 @@ impl SimdWide {
         chunks
             .remainder()
             .iter()
-            .fold(total.reduce_add(), |sum, &x| sum + (x - max).exp())
+            .fold(total.reduce_add(), |sum, &x| sum + utils::expf(x - max))
     }
 
     pub(super) fn linear_forward(
@@ -238,7 +242,7 @@ impl SimdWide {
                 .fold(variance_v.reduce_add(), |sum, &v| {
                     sum + (v - mean) * (v - mean)
                 });
-            let inv = 1.0 / (variance / s.channels as f32 + s.epsilon).sqrt();
+            let inv = 1.0 / utils::sqrtf(variance / s.channels as f32 + s.epsilon);
             for i in (0..end).step_by(LANES) {
                 let normalized = (load(&values[i..]) - mean_v) * f32x8::splat(inv);
                 store(
@@ -392,7 +396,7 @@ impl SimdWide {
     ) {
         let c = s.channels;
         let d = c / s.heads;
-        let scale = 1.0 / (d as f32).sqrt();
+        let scale = 1.0 / utils::sqrtf(d as f32);
         let mut rng = Self::dropout_rng(mode, s.dropout, 0);
         if let Some(saved) = cache.as_deref_mut() {
             let count = s.batch * s.heads * s.time * s.time;
@@ -453,7 +457,7 @@ impl SimdWide {
     ) {
         let c = s.channels;
         let d = c / s.heads;
-        let scale = 1.0 / (d as f32).sqrt();
+        let scale = 1.0 / utils::sqrtf(d as f32);
         dqkv.fill(0.0);
         for b in 0..s.batch {
             for h in 0..s.heads {
@@ -498,7 +502,7 @@ impl SimdWide {
         for (r, row) in logits.chunks_exact(vocab).enumerate() {
             let max = Self::maximum(row);
             let total = Self::exp_sum(row, max);
-            loss += ((max - row[targets[r]]) + total.ln()) * scale;
+            loss += ((max - row[targets[r]]) + utils::logf(total)) * scale;
             if let Some(g) = gradient.as_deref_mut() {
                 let g = &mut g[r * vocab..(r + 1) * vocab];
                 for (chunk_index, chunk) in row.chunks(LANES).enumerate() {
@@ -533,8 +537,8 @@ impl SimdWide {
         groups: &mut [AdamWGroup<'_, Vec<f32>>],
         config: AdamWConfig,
     ) -> anyhow::Result<()> {
-        let correction1 = 1.0 - config.beta1.powi(config.step);
-        let correction2 = 1.0 - config.beta2.powi(config.step);
+        let correction1 = 1.0 - utils::powi(config.beta1, config.step);
+        let correction2 = 1.0 - utils::powi(config.beta2, config.step);
         let b1 = f32x8::splat(config.beta1);
         let b2 = f32x8::splat(config.beta2);
         let decay = 1.0 - config.learning_rate * config.weight_decay;
@@ -564,7 +568,7 @@ impl SimdWide {
                 let m = config.beta1 * g.first_moment[i] + (1.0 - config.beta1) * gradient;
                 let v =
                     config.beta2 * g.second_moment[i] + (1.0 - config.beta2) * gradient * gradient;
-                let denominator = (v / correction2).sqrt() + config.epsilon;
+                let denominator = utils::sqrtf(v / correction2) + config.epsilon;
                 let value =
                     g.values[i] * decay - config.learning_rate * (m / correction1) / denominator;
                 anyhow::ensure!(

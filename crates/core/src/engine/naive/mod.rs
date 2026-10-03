@@ -1,11 +1,17 @@
+use alloc::{vec, vec::Vec};
+
 mod kernels;
 mod types;
 
 pub use types::*;
 
-use crate::engine::{
-    AdamWConfig, AdamWGroup, BlockGradients, BlockSpec, BlockWeights, EmbeddingSpec, Engine,
-    ForwardMode, LinearGradients, LinearSpec, LinearWeights, NormGradients, NormSpec, NormWeights,
+use crate::{
+    engine::{
+        AdamWConfig, AdamWGroup, BlockGradients, BlockSpec, BlockWeights, EmbeddingSpec, Engine,
+        ForwardMode, LinearGradients, LinearSpec, LinearWeights, NormGradients, NormSpec,
+        NormWeights,
+    },
+    utils,
 };
 
 pub type NaiveBuffer = Vec<f32>;
@@ -460,8 +466,8 @@ impl Engine for Naive {
             "invalid AdamW configuration"
         );
 
-        let correction1 = 1.0 - config.beta1.powi(config.step);
-        let correction2 = 1.0 - config.beta2.powi(config.step);
+        let correction1 = 1.0 - utils::powi(config.beta1, config.step);
+        let correction2 = 1.0 - utils::powi(config.beta2, config.step);
 
         for g in groups {
             for i in 0..g.values.len() {
@@ -473,7 +479,7 @@ impl Engine for Naive {
                 let v = config.beta2 * g.second_moment[i];
                 let v = v + (1.0 - config.beta2) * gradient * gradient;
 
-                let vx = (v / correction2).sqrt() + config.epsilon;
+                let vx = utils::sqrtf(v / correction2) + config.epsilon;
                 let vx = config.learning_rate * (m / correction1) / vx;
                 let vx = g.values[i] * (1.0 - config.learning_rate * config.weight_decay) - vx;
 
@@ -506,13 +512,13 @@ impl Engine for Naive {
         );
 
         let max = last.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-        let total: f32 = last.iter().map(|v| (v - max).exp()).sum();
+        let total: f32 = last.iter().map(|v| utils::expf(v - max)).sum();
         let threshold = uniform * total;
         let mut cumulative = 0.0;
         let mut fallback = 0;
 
         for (index, &value) in last.iter().enumerate() {
-            let mass = (value - max).exp();
+            let mass = utils::expf(value - max);
             if mass > 0.0 {
                 fallback = index;
             }
