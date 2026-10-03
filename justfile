@@ -7,18 +7,20 @@ check-format:
   cargo fmt --all -- --check
 
 check-clippy:
-  cargo clippy --workspace --all-targets -- -D warnings
+  cargo clippy --workspace --exclude ya-gpt-cuda --all-targets -- -D warnings
 
 check-test:
-  cargo test
+  cargo test --workspace --exclude ya-gpt-cuda
 
 check-doc:
-  RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
+  RUSTDOCFLAGS="-D warnings" cargo doc --workspace --exclude ya-gpt-cuda --no-deps
 
 check-features:
-  RUSTFLAGS="-D warnings" cargo check --workspace --all-targets
+  RUSTFLAGS="-D warnings" cargo check --workspace --exclude ya-gpt-cuda --all-targets
   RUSTFLAGS="-D warnings" cargo hack check \
+    --workspace --exclude ya-gpt-cuda \
     --feature-powerset \
+    --exclude-features cuda,ya-gpt-cuda \
     --no-dev-deps
 
 train-and-run prompt="ROMEO:":
