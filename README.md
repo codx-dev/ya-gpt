@@ -16,7 +16,7 @@ A model will start to perform reasonably with ~1.88 loss (cross-entropy). Any va
 # RTX 4500 ADA
 $ time just train-cuda 0 large 10000
 ..
-step 10000: train loss 0.8112, val loss 1.5552
+step 10000: train loss 0.8152, val loss 1.5977
 just train-cuda 0 large 10000  2166.29s user 592.70s system 99% cpu 46:11.70 total
 ```
 
@@ -28,23 +28,32 @@ $ cargo run -- inspect --pretty --input ./assets/model-shakespeare-large-10000.b
   "major": "0",
   "fp": "f32",
   "params": 4833858,
-  "train_loss": 0.8112385,
-  "validation_loss": 1.5552003
+  "train_loss": 0.81526476,
+  "validation_loss": 1.5977424
 }
 ```
 
 ```
-$ just generate-cuda 0 250 ./assets/model-shakespeare-large-10000.bin
+$ just generate-cuda 0 250 ./assets/model-shakespeare-large-10000.bin "ROMEO:"
 ROMEO:
-Nay, poor soul, will I leave your ship dry,
-To me to help you the discloud with a false peace!
+O, every son, of all things loyal renown'd
+With uprights trouble mine.
+As I am confidence!
 
-QUEEN ELIZABETH:
-Why, then, Catesby, I say, let the confound
-The rest rather of the Gloucester's pardon.
+BENVOLIO:
+Stay, your name is Catesby Peruchio,
+For the wrath that were laid more than they will not have;
+For there is a great sorrow to your confirmmand.
+```
 
-KING RICHARD III:
-Well, my guiss, I would do th%                                                                                           
+```
+$ just generate-cuda 0 250 ./assets/model-poe-poem-large-10000.bin "Once upon"
+Once upon the atmosphere.
+
+  Roman idolation was utterly natural. Charmion; doubtless,
+  born riven one that he would have been looked upon it,
+  _I_ was greatly within my desire, and, above half the envy of awakes blue and
+  vague unquisition, and conve
 ```
 
 ### Planned features

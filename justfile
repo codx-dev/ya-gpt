@@ -23,11 +23,11 @@ check-features:
     --exclude-features cuda,ya-gpt-cuda \
     --no-dev-deps
 
-train-and-run prompt="ROMEO:":
-  cargo run --release -- train --preset tiny --input data/tinyshakespeare.txt | \
-    cargo run --release -- generate --num-tokens 500 {{prompt}}
+train-and-run prompt="The foundation is:":
+  cargo run --release -- train --preset tiny --input data/shakespeare.txt | \
+    cargo run --release -- generate --num-tokens 500 "{{prompt}}"
 
-train-naive preset="small" iterations="100" input="data/tinyshakespeare.txt" output="./out/model-naive.bin":
+train-naive preset="small" iterations="100" input="data/shakespeare.txt" output="./out/model-naive.bin":
   RUSTFLAGS="-C target-cpu=native" \
     cargo run --release -p ya-gpt-cli -- train \
       --engine naive \
@@ -36,7 +36,7 @@ train-naive preset="small" iterations="100" input="data/tinyshakespeare.txt" out
       --input {{input}} \
       --output {{output}}
 
-train-simd-wide preset="small" iterations="100" input="data/tinyshakespeare.txt" output="./out/model-simd-wide.bin":
+train-simd-wide preset="small" iterations="100" input="data/shakespeare.txt" output="./out/model-simd-wide.bin":
   RUSTFLAGS="-C target-cpu=native" \
     cargo run --release -p ya-gpt-cli --features simd-wide -- train \
       --engine simd-wide \
@@ -45,7 +45,7 @@ train-simd-wide preset="small" iterations="100" input="data/tinyshakespeare.txt"
       --input {{input}} \
       --output {{output}}
 
-train-cuda device="0" preset="small" iterations="100" input="data/tinyshakespeare.txt" output="./out/model-cuda.bin":
+train-cuda device="0" preset="small" iterations="100" input="data/shakespeare.txt" output="./out/model-cuda.bin":
   RUSTFLAGS="-C target-cpu=native" \
     cargo run --release -p ya-gpt-cli --features cuda -- train \
       --engine cuda:{{device}} \
@@ -54,31 +54,31 @@ train-cuda device="0" preset="small" iterations="100" input="data/tinyshakespear
       --input {{input}} \
       --output {{output}}
 
-generate-naive tokens="500" input="./out/model-naive.bin" prompt="ROMEO:":
+generate-naive tokens="500" input="./out/model-naive.bin" prompt="The foundation is:":
   RUSTFLAGS="-C target-cpu=native" \
     cargo run --release -p ya-gpt-cli  -- generate \
       --engine naive \
       --input {{input}} \
       --num-tokens {{tokens}} \
-      {{prompt}}
+      "{{prompt}}"
 
-generate-simd-wide tokens="500" input="./out/model-simd-wide.bin" prompt="ROMEO:":
+generate-simd-wide tokens="500" input="./out/model-simd-wide.bin" prompt="The foundation is:":
   RUSTFLAGS="-C target-cpu=native" \
     cargo run --release -p ya-gpt-cli --features simd-wide -- generate \
       --engine simd-wide \
       --input {{input}} \
       --num-tokens {{tokens}} \
-      {{prompt}}
+      "{{prompt}}"
 
-generate-cuda device="0" tokens="500" input="./out/model-cuda.bin" prompt="ROMEO:":
+generate-cuda device="0" tokens="500" input="./out/model-cuda.bin" prompt="The foundation is:":
   RUSTFLAGS="-C target-cpu=native" \
     cargo run --release -p ya-gpt-cli --features cuda -- generate \
       --engine cuda:{{device}} \
       --input {{input}} \
       --num-tokens {{tokens}} \
-      {{prompt}}
+      "{{prompt}}"
 
-flamegraph preset="tiny" iterations="100" input="data/tinyshakespeare.txt" output="./out/model-flamegraph.bin":
+flamegraph preset="tiny" iterations="100" input="data/shakespeare.txt" output="./out/model-flamegraph.bin":
   mkdir -p out
   CARGO_PROFILE_RELEASE_DEBUG=true \
     CARGO_PROFILE_RELEASE_STRIP=none \

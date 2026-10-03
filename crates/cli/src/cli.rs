@@ -301,15 +301,12 @@ mod tests {
             ("medium", ModelConfig::medium(), 32, 5_000),
             ("large", ModelConfig::large(), 64, 10_000),
         ] {
-            let args = parse_train(&["--preset", preset, "--input", "data/tinyshakespeare.txt"]);
+            let args = parse_train(&["--preset", preset, "--input", "data/shakespeare.txt"]);
             assert_eq!(args.resolved_model().unwrap(), model);
             let options = args.resolved_options();
             assert_eq!(options.batch_size, Some(batch_size));
             assert_eq!(options.iterations, Some(iterations));
-            assert_eq!(
-                options.input,
-                Some(PathBuf::from("data/tinyshakespeare.txt"))
-            );
+            assert_eq!(options.input, Some(PathBuf::from("data/shakespeare.txt")));
         }
     }
 
