@@ -1,7 +1,12 @@
+mod frontend
+
 default:
   just --list --list-submodules
 
-check: check-format check-clippy check-test check-doc check-features
+check: check-format check-clippy check-test check-doc check-features check-wasm
+
+check-wasm:
+  cargo check -p ya-gpt-wasm --target wasm32-unknown-unknown
 
 check-format:
   cargo fmt --all -- --check

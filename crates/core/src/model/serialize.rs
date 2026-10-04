@@ -38,15 +38,18 @@ impl ModelHeader {
         }
     }
 
+    pub fn with_author(mut self, author: &str) -> Self {
+        self.authors = author.into();
+        self
+    }
+
     pub fn is_current(&self) -> bool {
         self.name == Self::NAME && self.major == Self::MAJOR && self.fp == Self::FP
     }
 }
 
 impl<EN: Engine> Gpt<EN> {
-    pub fn to_bytes(&self, en: &EN) -> anyhow::Result<Vec<u8>> {
-        let header = ModelHeader::from_model(en, self);
-
+    pub fn to_bytes_with_header(&self, en: &EN, header: &ModelHeader) -> anyhow::Result<Vec<u8>> {
         let Self {
             config,
             vocab_size,
@@ -82,6 +85,18 @@ impl<EN: Engine> Gpt<EN> {
         validation_loss.pack(encoder);
 
         Ok(encoder_owned.into_inner())
+    }
+
+    pub fn to_bytes(&self, en: &EN) -> anyhow::Result<Vec<u8>> {
+        let header = ModelHeader::from_model(en, self);
+
+        self.to_bytes_with_header(en, &header)
+    }
+
+    pub fn to_bytes_with_author(&self, en: &EN, author: &str) -> anyhow::Result<Vec<u8>> {
+        let header = ModelHeader::from_model(en, self).with_author(author);
+
+        self.to_bytes_with_header(en, &header)
     }
 
     pub fn header_from_bytes(mut bytes: &[u8]) -> anyhow::Result<ModelHeader> {

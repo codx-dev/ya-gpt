@@ -1,0 +1,16 @@
+[package]
+name = "ya-gpt-wasm"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anyhow.workspace = true
+ya-gpt = { path = "../core", default-features = false }
+rand = { workspace = true, default-features = false, features = ["alloc", "std_rng"] }
+
+[dev-dependencies]
+serde_json.workspace = true

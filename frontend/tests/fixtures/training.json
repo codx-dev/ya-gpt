@@ -1,0 +1,46 @@
+[
+  {
+    "final_loss": 1.5702513456344604,
+    "initial_loss": 1.7920374870300293,
+    "name": "training-dropout",
+    "options": {
+      "backend": "webgpu",
+      "batch_size": 2,
+      "iterations": 4,
+      "learning_rate": 0.01,
+      "model": {
+        "block_size": 5,
+        "dropout": 0.20000000298023224,
+        "n_embd": 6,
+        "n_head": 2,
+        "n_layer": 2
+      },
+      "report_loss_per_step": false,
+      "seed": "42",
+      "weight_decay": 0.01
+    },
+    "text": "abcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabc"
+  },
+  {
+    "final_loss": 1.3453407287597656,
+    "initial_loss": 1.8064998388290405,
+    "name": "training-learning",
+    "options": {
+      "backend": "webgpu",
+      "batch_size": 2,
+      "iterations": 8,
+      "learning_rate": 0.01,
+      "model": {
+        "block_size": 5,
+        "dropout": 0.0,
+        "n_embd": 6,
+        "n_head": 2,
+        "n_layer": 2
+      },
+      "report_loss_per_step": false,
+      "seed": "18446744073709551615",
+      "weight_decay": 0.01
+    },
+    "text": "abcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabc"
+  }
+]

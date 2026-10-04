@@ -56,6 +56,17 @@ Once upon the atmosphere.
   vague unquisition, and conve
 ```
 
+### Browser generation and training
+
+The `frontend` uses a Rust/WASM `Engine` bridge with TypeScript WebGPU kernels for
+local text generation and training. Install the `wasm32-unknown-unknown` Rust target,
+then run `npm install` and `npm run dev` inside `frontend`. The Train tab creates a
+new model from text, reports progress and losses, and supports stopping after the
+current step. Download the resulting `.bin` file or select **Use model** to generate
+with it. CPU SIMD and training resume are not implemented in the browser.
+See the [WASM bridge documentation](crates/wasm/README.md)
+for the build, tests, and ABI.
+
 ### Planned features
 
 - May introduce a miniBPE tokenizer. The goal of this repo is to be able to train models with a consumer grade GPU, but the self-attention quadratic sequence length fallout is a problem for char-stream tokenizers. miniBPE (1k-2k tokens vs 50k of standard BPE) will still be doable on a good desktop GPU (~12VRAM), but need to check the time to complete the train.

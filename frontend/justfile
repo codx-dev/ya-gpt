@@ -1,0 +1,22 @@
+default:
+  @just --list
+
+# Install frontend dependencies.
+install:
+  npm install
+
+# Build the Rust WASM artifact for the frontend.
+wasm:
+  npm run wasm:build
+
+deploy-nginx dir="/var/www/gpt":
+  sudo rsync -av --delete ./dist/ {{dir}}/
+  sudo chown -R 'http:http' {{dir}}
+
+# Start the Vite development server on the given bind address.
+dev host="0.0.0.0":
+  npm run dev -- --host {{quote(host)}}
+
+# Build the static site in frontend/dist/.
+build:
+  npm run build
