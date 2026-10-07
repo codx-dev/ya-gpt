@@ -22,6 +22,7 @@ pub struct Gpt<EN: Engine> {
     pub language_head: Linear<EN>,
     pub train_loss: f32,
     pub validation_loss: f32,
+    pub train_tokens: usize,
 }
 
 pub struct GptCache<EN: Engine> {
@@ -40,7 +41,7 @@ impl<EN: Engine> Gpt<EN> {
         tokenizer: Tokenizer,
         rng: &mut impl Rng,
     ) -> anyhow::Result<Self> {
-        let vocab_size = tokenizer.chars().len();
+        let vocab_size = tokenizer.vocab_size();
         let config = config.validate(Some(vocab_size))?;
         let c = config.n_embd;
 
@@ -58,6 +59,7 @@ impl<EN: Engine> Gpt<EN> {
         let language_head = Linear::new(en, c, vocab_size, true, rng)?;
         let train_loss = 0.0;
         let validation_loss = 0.0;
+        let train_tokens = 0;
 
         Ok(Self {
             blocks,
@@ -70,6 +72,7 @@ impl<EN: Engine> Gpt<EN> {
             tokenizer,
             train_loss,
             validation_loss,
+            train_tokens,
         })
     }
 

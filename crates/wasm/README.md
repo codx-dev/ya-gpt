@@ -31,6 +31,20 @@ base, including subdirectories. There is no checked-in placeholder or fallback
 binary. Use HTTPS or localhost in a browser with WebGPU. Model inspection remains
 available when compute initialization fails.
 
+The Inspect tab calls the core `rich_header_from_bytes` parser through a separate
+WASM instance, sharing the compiled module with generation. It requires WASM but
+does not require WebGPU or a worker, and remains available during training. The
+browser reads at most `4 * 64 * 1024 + 256` bytes from the model file; the parser
+only decodes metadata, without loading tokenizer data or tensors. Each metadata
+string is limited to 64 KiB of UTF-8 text. Inspection validates metadata, not the
+complete model.
+
+Inspection returns the same flat `RichModelHeader` JSON shape as the CLI, including
+`version`, `config`, `vocab_size`, and `train_tokens`. The last field counts tokens
+in the training data split, not tokens processed over all optimizer steps. Version
+0 files display “Not recorded” for that count, while their JSON retains the core's
+`train_tokens: 0` fallback. Version 1 displays its stored count, including zero.
+
 ```sh
 cargo test -p ya-gpt-wasm
 cargo run -p ya-gpt-wasm --example fixtures # refresh deterministic Naive fixtures
@@ -165,6 +179,14 @@ completed steps, total steps, train-loss bits, validation-loss bits. Phases are
 5 export readback, 6 complete, 7 stopped before any step. Phases 6 and 7 need no
 readback. Unknown losses are represented by NaN until evaluation completes.
 Training and generation sessions are mutually exclusive within each instance.
+
+Model inspection adds four exports while retaining ABI v1:
+
+| Export | Contract |
+| --- | --- |
+| `model_inspect(model_ptr, model_len)` | Borrows a metadata prefix from a live allocation, limited to `4 * 64 * 1024 + 256` bytes. Calls the core rich-header parser for versions 0 and 1 and stores UTF-8 JSON. Clears the previous result, including on failure. Does not access GPU imports or compute sessions. |
+| `model_inspect_result_ptr()`, `model_inspect_result_len()` | Borrow the JSON until the next inspection or inspection cleanup. Return zero when there is no result. |
+| `model_inspect_end()` | Idempotently releases the JSON result. The caller separately frees its input allocation. |
 
 Model serialization adds four exports while retaining ABI v1:
 

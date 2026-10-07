@@ -11,6 +11,4 @@ crate-type = ["cdylib", "rlib"]
 anyhow.workspace = true
 ya-gpt = { path = "../core", default-features = false }
 rand = { workspace = true, default-features = false, features = ["alloc", "std_rng"] }
-
-[dev-dependencies]
 serde_json.workspace = true

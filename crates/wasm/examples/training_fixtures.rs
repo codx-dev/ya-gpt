@@ -26,7 +26,7 @@ fn main() -> anyhow::Result<()> {
             dropout,
         };
         let mut rng = StdRng::seed_from_u64(seed);
-        let tokenizer = Tokenizer::new(&text);
+        let tokenizer = Tokenizer::char_stream(&text);
         let mut model = Gpt::new(&Naive, config.clone(), tokenizer, &mut rng)?;
         let tokens = model.tokenizer.encode("abcab");
         let targets = model.tokenizer.encode("bcabc");

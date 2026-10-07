@@ -1,80 +1,42 @@
-use core::iter;
-
-use alloc::{
-    collections::{BTreeMap, BTreeSet},
-    string::String,
-    vec::Vec,
-};
+use alloc::{string::String, vec::Vec};
 
 use msgpacker::MsgPacker;
 
+mod charstream;
+
+pub use charstream::CharTokenizer;
+
 #[derive(Debug, Clone, PartialEq, Eq, MsgPacker)]
-pub struct Tokenizer {
-    pub chars: Vec<char>,
-    pub char_to_idx: BTreeMap<char, usize>,
+pub enum Tokenizer {
+    CharStream(CharTokenizer),
 }
 
 impl Tokenizer {
-    /// Unknown token.
-    pub const UNK: char = char::MIN;
-
-    pub fn new(input: &str) -> Self {
-        let chars: BTreeSet<char> = iter::once(Self::UNK).chain(input.chars()).collect();
-        let chars: Vec<_> = chars.into_iter().collect();
-        let char_to_idx = chars
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(i, c)| (c, i))
-            .collect();
-
-        Self { chars, char_to_idx }
+    pub fn char_stream(input: &str) -> Self {
+        Self::CharStream(CharTokenizer::new(input))
     }
 
-    pub fn chars(&self) -> &[char] {
-        &self.chars
+    pub fn as_char_stream(&self) -> Option<&CharTokenizer> {
+        match self {
+            Tokenizer::CharStream(t) => Some(t),
+        }
+    }
+
+    pub fn vocab_size(&self) -> usize {
+        match self {
+            Tokenizer::CharStream(t) => t.vocab_size(),
+        }
     }
 
     pub fn encode(&self, input: &str) -> Vec<usize> {
-        // TODO very naive/simple per char implementation
-        input
-            .chars()
-            .map(|c| self.char_to_idx.get(&c).copied().unwrap_or(0))
-            .collect()
+        match self {
+            Tokenizer::CharStream(t) => t.encode(input),
+        }
     }
 
     pub fn decode(&self, input: &[usize]) -> String {
-        input
-            .iter()
-            .map(|i| self.chars.get(*i).copied().unwrap_or(Self::UNK))
-            .collect()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const INPUT: &str = include_str!("../../../../data/shakespeare.txt");
-
-    #[test]
-    fn alphabet_is_consistent() {
-        let alphabet = Tokenizer::new(INPUT).chars().to_vec();
-
-        assert_eq!(66, alphabet.len());
-        assert_eq!(
-            "\0\n !$&',-.3:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-            alphabet.into_iter().collect::<String>()
-        );
-    }
-
-    #[test]
-    fn encode_decode_is_consistent() {
-        let input = "Confess yourselves wondrous malicious,";
-        let tokenizer = Tokenizer::new(INPUT);
-        let encoded = tokenizer.encode(input);
-        let decoded = tokenizer.decode(&encoded);
-
-        assert_eq!(input, decoded);
+        match self {
+            Tokenizer::CharStream(t) => t.decode(input),
+        }
     }
 }

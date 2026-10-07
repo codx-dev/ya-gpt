@@ -59,7 +59,7 @@ export function TrainPanel({ backend, available, blocked, onUseModel }: { backen
       const metadata = await runtime.inspectModel(file);
       if (mounted.current) {
         setTrained({ result, file });
-        setAuthor(metadata.header.authors); setExportError(''); prepared.current = undefined;
+        setAuthor(metadata.authors); setExportError(''); prepared.current = undefined;
         setNotice(result.stopped ? `Stopped after ${result.completed} completed steps. Your model is ready.` : 'Training complete. Your model is ready.');
       }
     } catch (cause) {

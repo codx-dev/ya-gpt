@@ -89,6 +89,27 @@ generate-cuda device="0" tokens="500" input="./out/model-cuda.bin" prompt="The f
       --num-tokens {{tokens}} \
       "{{prompt}}"
 
+jev-similarity-cuda device="0" tokens="500" input="./assets/model-dostoyevsky-dark-large-10000.bin" author="Dostoyevsky" prompt="The true essence of being is ":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    just generate-cuda {{device}} {{tokens}} {{input}} "{{prompt}}" | \
+      jq -Rs \
+        --arg author "{{author}}" \
+        '{
+          state: .,
+          model: "jev-latest",
+          questions: {
+            similarity: {
+              type: "noul",
+              instructions: "Does this look like it'\''s written by \($author)?"
+            }
+          }
+        }' | curl -s -X POST "https://api.typesafe.ai/v1/systemone" \
+        -H "Authorization: Bearer $TYPESAFE_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d @- | jq -r '.answers.similarity.noul'
+
 flamegraph preset="tiny" iterations="100" input="data/shakespeare.txt" output="./out/model-flamegraph.bin":
   mkdir -p out
   CARGO_PROFILE_RELEASE_DEBUG=true \

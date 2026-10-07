@@ -72,7 +72,7 @@ fn model_serialization_round_trip_preserves_contents() {
     let mut model = Gpt::new(
         &Naive,
         ModelConfig::micro(),
-        Tokenizer::new("abc"),
+        Tokenizer::char_stream("abc"),
         &mut rng(),
     )
     .unwrap();
@@ -926,7 +926,7 @@ fn adamw_matches_cpu_and_reports_invalid_updates() {
 #[ignore = "requires CUDA hardware"]
 fn complete_model_parity_training_generation_and_serialization() {
     let en = gpu();
-    let tokenizer = Tokenizer::new("abc");
+    let tokenizer = Tokenizer::char_stream("abc");
     let config = ModelConfig::micro();
     let mut cpu = Gpt::new(&Naive, config.clone(), tokenizer.clone(), &mut rng()).unwrap();
     let bytes = cpu.to_bytes(&Naive).unwrap();

@@ -14,6 +14,9 @@ test('the Rust WASM exposes ABI v1 with only handwritten GPU imports', async () 
     buffer_create: () => 0, buffer_upload: () => -1, buffer_release: () => {}, dispatch: () => -1,
   } });
   assert.equal((instance.exports.version as () => number)(), 1);
+  for (const name of ['model_inspect', 'model_inspect_result_ptr', 'model_inspect_result_len', 'model_inspect_end']) {
+    assert.equal(typeof instance.exports[name], 'function', name);
+  }
   assert.equal((instance.exports.training_version as () => number)(), 1);
   assert.equal((instance.exports.training_end as () => number)(), 0);
   assert.equal((instance.exports.training_stop as () => number)(), -1);

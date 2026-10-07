@@ -91,7 +91,7 @@ fn main() -> anyhow::Result<()> {
         None,
     )?;
     let block = json!({"input":input,"expected":output,"norm1":[block.norm1.gamma.values,block.norm1.beta.values],"qkv":block.qkv.values,"attention":[block.attention.weight.values,block.attention.bias.unwrap().values],"norm2":[block.norm2.gamma.values,block.norm2.beta.values],"expand":[block.expand.weight.values,block.expand.bias.unwrap().values],"project":[block.project.weight.values,block.project.bias.unwrap().values]});
-    let model = Gpt::new(&en, config, Tokenizer::new("abcé🦀"), &mut rng)?;
+    let model = Gpt::new(&en, config, Tokenizer::char_stream("abcé🦀"), &mut rng)?;
     let tokens = model.tokenizer.encode("abc");
     let logits = model.forward(&en, &tokens, 1, tokens.len(), &mut rng)?;
     let generated = model.generate(&en, &tokens, 8, &mut StdRng::seed_from_u64(42))?;

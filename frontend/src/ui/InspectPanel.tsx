@@ -7,7 +7,8 @@ export function InspectPanel({ model }: { model?: LoadedModel }) {
     <div className="empty-inspection"><span aria-hidden="true">{ '{ }' }</span><h3>No model selected</h3><p>Choose a local binary, download from a URL, or load the Shakespeare example to inspect its metadata.</p></div>
   </>;
 
-  const { header, config, vocab_size } = model.metadata;
+  const header = model.metadata;
+  const { config, vocab_size, train_tokens } = header;
   return <>
     <div className="panel-heading"><span className="eyebrow">03 / INSPECT</span><span className="tag success">METADATA READ</span></div>
     <p className="section-description">{model.name}</p>
@@ -23,11 +24,12 @@ export function InspectPanel({ model }: { model?: LoadedModel }) {
         <div><dt>Attention heads</dt><dd>{config.n_head}</dd></div>
         <div><dt>Transformer layers</dt><dd>{config.n_layer}</dd></div>
         <div><dt>Dropout</dt><dd>{Number(config.dropout.toFixed(6))}</dd></div>
-        <div><dt>Vocabulary</dt><dd>{vocab_size} characters</dd></div>
-      </dl></div>
+        <div><dt>Vocabulary</dt><dd>{vocab_size.toLocaleString('en-US')} tokens</dd></div>
+        <div><dt>Training tokens</dt><dd>{header.version === '0' ? 'Not recorded' : train_tokens.toLocaleString('en-US')}</dd></div>
+      </dl><p className="helper">Training tokens is the number of tokens in the training data split.</p></div>
       <div><h3>Model file</h3><dl>
         <div><dt>Name</dt><dd>{header.name}</dd></div>
-        <div><dt>Format version</dt><dd>{header.major}</dd></div>
+        <div><dt>Format version</dt><dd>{header.version}</dd></div>
         <div><dt>Precision</dt><dd>{header.fp}</dd></div>
         <div><dt>File size</dt><dd>{formatBytes(model.file.size)}</dd></div>
         <div><dt>Source</dt><dd>{model.source}</dd></div>

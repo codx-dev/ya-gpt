@@ -14,7 +14,13 @@ fn rng() -> StdRng {
     StdRng::seed_from_u64(42)
 }
 fn model<E: Engine>(en: &E) -> Gpt<E> {
-    Gpt::new(en, ModelConfig::micro(), Tokenizer::new("abc"), &mut rng()).unwrap()
+    Gpt::new(
+        en,
+        ModelConfig::micro(),
+        Tokenizer::char_stream("abc"),
+        &mut rng(),
+    )
+    .unwrap()
 }
 fn close(a: &[f32], b: &[f32], tolerance: f32) {
     assert_eq!(a.len(), b.len());
@@ -45,7 +51,7 @@ fn initialization_and_disabled_dropout_are_reproducible() {
     close(&cached, &inference, 0.);
     let mut config = ModelConfig::micro();
     config.dropout = 0.4;
-    let gpt = Gpt::new(&Naive, config, Tokenizer::new("abc"), &mut rng()).unwrap();
+    let gpt = Gpt::new(&Naive, config, Tokenizer::char_stream("abc"), &mut rng()).unwrap();
     let mut source = rng();
     gpt.forward_with_cache(&Naive, &[0, 1, 2, 0], 1, 4, false, &mut source)
         .unwrap();

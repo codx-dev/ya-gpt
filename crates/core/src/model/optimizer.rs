@@ -55,6 +55,8 @@ impl<EN: Engine> AdamW<EN, BasicReporter> {
             .map(|p| en.zeroes(en.buffer_len(&p.values)))
             .collect::<anyhow::Result<Vec<_>>>()?;
 
+        model.train_tokens = train.len();
+
         Ok(Self {
             learning_rate,
             weight_decay,

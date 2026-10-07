@@ -90,6 +90,22 @@ impl std::str::FromStr for Engine {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tokenizer {
+    CharStream,
+}
+
+impl std::str::FromStr for Tokenizer {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "char-stream" => Ok(Self::CharStream),
+            _ => Err(format!("unsupported tokenizer: {value}")),
+        }
+    }
+}
+
 #[derive(Args, Debug)]
 pub struct ModelArgs {
     /// Context length; otherwise taken from the preset.
@@ -117,6 +133,10 @@ pub struct ModelArgs {
 pub struct TrainArgs {
     #[command(flatten)]
     pub common: CommonArgs,
+
+    /// Tokenizer implementation: char-stream.
+    #[arg(long, default_value = "char-stream")]
+    pub tokenizer: Tokenizer,
 
     #[command(flatten)]
     pub model: ModelArgs,
@@ -200,6 +220,7 @@ impl TrainArgs {
             learning_rate: self.learning_rate,
             weight_decay: self.weight_decay,
             input: self.input.clone(),
+            tokenizer: self.tokenizer,
             report_loss_per_step: self.report_loss_per_step,
         }
     }
@@ -212,6 +233,7 @@ pub struct TrainingOptions {
     pub learning_rate: Option<f32>,
     pub weight_decay: Option<f32>,
     pub input: Option<PathBuf>,
+    pub tokenizer: Tokenizer,
     pub report_loss_per_step: bool,
 }
 

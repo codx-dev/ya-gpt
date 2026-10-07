@@ -67,8 +67,8 @@ impl Training {
             "invalid optimizer settings"
         );
         ensure!(args[9] <= 1, "invalid loss reporting flag");
-        let tokenizer = Tokenizer::new(text);
-        let config = config.validate(Some(tokenizer.chars.len()))?;
+        let tokenizer = Tokenizer::char_stream(text);
+        let config = config.validate(Some(tokenizer.vocab_size()))?;
         let len = text.chars().count();
         let split = len / 10 * 9 + len % 10 * 9 / 10;
         ensure!(
@@ -77,7 +77,7 @@ impl Training {
         );
         positive(&[batch, config.block_size, config.n_embd, 4])?;
         positive(&[batch, config.n_head, config.block_size, config.block_size])?;
-        positive(&[batch, config.block_size, tokenizer.chars.len()])?;
+        positive(&[batch, config.block_size, tokenizer.vocab_size()])?;
         let mut rng = StdRng::seed_from_u64(u64::from(args[10]) | u64::from(args[11]) << 32);
         let mut model = Gpt::new(&E, config.clone(), tokenizer.clone(), &mut rng)?;
         model.train_loss = f32::NAN;

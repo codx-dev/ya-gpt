@@ -500,7 +500,7 @@ mod tests {
         let model = Gpt::new(
             &Naive,
             config,
-            Tokenizer::new("abc"),
+            Tokenizer::char_stream("abc"),
             &mut StdRng::seed_from_u64(42),
         )
         .unwrap();

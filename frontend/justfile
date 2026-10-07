@@ -9,7 +9,7 @@ install:
 wasm:
   npm run wasm:build
 
-deploy-nginx dir="/var/www/gpt":
+deploy-nginx dir="/var/www/gpt": build
   sudo rsync -av --delete ./dist/ {{dir}}/
   sudo chown -R 'http:http' {{dir}}
 

@@ -8,10 +8,12 @@ use ya_gpt::{
     config::ModelConfig,
     engine::{self, Engine as GptEngine},
     model::{gpt::Gpt, optimizer::AdamW},
-    tokenizer::Tokenizer,
+    tokenizer::Tokenizer as GptTokenizer,
 };
 
-use crate::cli::{Command, CommonArgs, Engine, GenerateArgs, InspectArgs, TrainingOptions};
+use crate::cli::{
+    Command, CommonArgs, Engine, GenerateArgs, InspectArgs, Tokenizer, TrainingOptions,
+};
 
 pub fn execute(command: &Command, stdout: &mut impl io::Write) -> anyhow::Result<()> {
     match command {
@@ -58,11 +60,12 @@ pub fn train(
             io::stdin().read_to_string(&mut input)?;
         }
 
-        let tokenizer = Tokenizer::new(&input);
         let mut rng = common.rng();
+        let tokenizer = match options.tokenizer {
+            Tokenizer::CharStream => GptTokenizer::char_stream(&input),
+        };
 
         let mut model = Gpt::new(en, config.clone(), tokenizer.clone(), &mut rng)?;
-
         let mut optimizer = AdamW::new(
             en,
             &tokenizer,
@@ -129,7 +132,7 @@ pub fn generate(args: &GenerateArgs) -> anyhow::Result<String> {
 pub fn inspect(args: &InspectArgs) -> anyhow::Result<String> {
     let bytes = read_bytes_from_input(args.input.as_ref())?;
     // engine is irrelevant for header parse
-    let header = Gpt::<engine::naive::Naive>::header_from_bytes(&bytes)?;
+    let header = Gpt::rich_header_from_bytes(&bytes)?;
     let output = if args.pretty {
         format!("{}\n", serde_json::to_string_pretty(&header)?)
     } else {

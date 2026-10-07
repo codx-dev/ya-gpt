@@ -14,6 +14,7 @@ struct State {
     session: Option<Session>,
     training: Option<crate::training::Training>,
     serialized: Vec<u8>,
+    inspected: Vec<u8>,
     error: String,
 }
 
@@ -256,6 +257,64 @@ pub extern "C" fn training_end() -> i32 {
     })
 }
 
+/// Inspect only the model prefix, without loading tensors or creating a compute session.
+#[unsafe(no_mangle)]
+pub extern "C" fn model_inspect(model_ptr: u32, model_len: u32) -> i32 {
+    status(|s| {
+        s.inspected = Vec::new();
+        // Four bounded strings plus room for MessagePack framing and scalar fields.
+        ensure!(
+            model_len > 0 && model_len <= 4 * 64 * 1024 + 256,
+            "Invalid model metadata prefix size."
+        );
+        let header = Gpt::rich_header_from_bytes(s.bytes(model_ptr, model_len)?)
+            .context("Invalid or truncated YA-GPT model metadata")?;
+        ensure!(
+            [&header.name, &header.authors, &header.version, &header.fp]
+                .iter()
+                .all(|value| value.len() <= 64 * 1024),
+            "Model metadata strings must not exceed 64 KiB of UTF-8 text."
+        );
+        ensure!(
+            header.name == "ya-gpt" && header.fp == "f32",
+            "Incompatible model: expected ya-gpt with f32 weights."
+        );
+        // serde_json encodes non-finite floats as null; reject them before serialization.
+        ensure!(
+            header.train_loss.is_finite()
+                && header.validation_loss.is_finite()
+                && header.config.dropout.is_finite(),
+            "Invalid model metadata: losses and dropout must be finite."
+        );
+        s.inspected = serde_json::to_vec(&header)?;
+        Ok(0)
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn model_inspect_result_ptr() -> u32 {
+    STATE.with_borrow(|s| {
+        if s.inspected.is_empty() {
+            0
+        } else {
+            s.inspected.as_ptr() as u32
+        }
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn model_inspect_result_len() -> u32 {
+    STATE.with_borrow(|s| s.inspected.len() as u32)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn model_inspect_end() -> i32 {
+    status(|s| {
+        s.inspected = Vec::new();
+        Ok(0)
+    })
+}
+
 /// Reserialize a completed model without creating GPU buffers or a compute session.
 #[unsafe(no_mangle)]
 pub extern "C" fn model_serialize(
@@ -350,6 +409,88 @@ mod tests {
             }
         });
         ptr
+    }
+
+    #[test]
+    fn inspection_matches_rich_headers_and_recovers_after_invalid_prefixes() {
+        let legacy = include_bytes!(
+            "../../../assets/model-shakespeare-small-30000-bs32-nembd32-head8-layer4.bin"
+        );
+        let mut model = Gpt::try_from_bytes(&Naive, legacy).unwrap();
+        model.train_tokens = 12_345;
+        let current = model.to_bytes(&Naive).unwrap();
+        for bytes in [legacy.as_slice(), current.as_slice()] {
+            let expected = Gpt::rich_header_from_bytes(bytes).unwrap();
+            // Metadata fits here; the remaining model data is deliberately unavailable.
+            let prefix = &bytes[..128];
+            let ptr = write(prefix);
+            assert_eq!(model_inspect(ptr, prefix.len() as u32), 0);
+            let actual = STATE.with_borrow(|s| {
+                serde_json::from_slice::<ya_gpt::model::serialize::RichModelHeader>(&s.inspected)
+                    .unwrap()
+            });
+            assert_eq!(actual, expected);
+            assert!(model_inspect_result_len() > 0);
+            assert_eq!(model_inspect(ptr, 1), -1);
+            assert_eq!(model_inspect_result_ptr(), 0);
+            assert_eq!(model_inspect_result_len(), 0);
+            assert_eq!(model_inspect(ptr, prefix.len() as u32), 0);
+            assert_eq!(model_inspect_end(), 0);
+            assert_eq!(model_inspect_end(), 0);
+            assert_eq!(model_inspect_result_ptr(), 0);
+            assert_eq!(model_inspect_result_len(), 0);
+            assert_eq!(dealloc(ptr), 0);
+        }
+        assert_eq!(model_inspect(0, 1), -1);
+        assert_eq!(model_inspect(0, 0), -1);
+        assert_eq!(model_inspect(0, 4 * 64 * 1024 + 257), -1);
+        STATE.with_borrow(|s| assert!(s.allocations.is_empty()));
+    }
+
+    #[test]
+    fn inspection_enforces_string_limits_compatibility_and_finite_losses() {
+        let model = Gpt::try_from_bytes(
+            &Naive,
+            include_bytes!("../../../frontend/tests/fixtures/micro.bin"),
+        )
+        .unwrap();
+        let valid = ya_gpt::model::serialize::ModelHeader::from_model(&Naive, &model);
+        for (field, message) in [
+            ("name", "Incompatible"),
+            ("version", "unknown version"),
+            ("fp", "Incompatible"),
+            ("authors", "64 KiB"),
+            ("train_loss", "finite"),
+            ("validation_loss", "finite"),
+        ] {
+            let mut header = valid.clone();
+            match field {
+                "name" => header.name = "other".into(),
+                "version" => header.version = "2".into(),
+                "fp" => header.fp = "f16".into(),
+                "authors" => header.authors = "é".repeat(32_769),
+                "train_loss" => header.train_loss = f32::NAN,
+                "validation_loss" => header.validation_loss = f32::INFINITY,
+                _ => unreachable!(),
+            }
+            let bytes = model.to_bytes_with_header(&Naive, &header).unwrap();
+            let ptr = write(&bytes);
+            assert_eq!(model_inspect(ptr, bytes.len() as u32), -1);
+            STATE.with_borrow(|s| assert!(s.error.contains(message), "{}", s.error));
+            assert_eq!(model_inspect_result_len(), 0);
+            assert_eq!(dealloc(ptr), 0);
+        }
+        let author = "🦀".repeat(16_384);
+        let bytes = model.to_bytes_with_author(&Naive, &author).unwrap();
+        let ptr = write(&bytes);
+        assert_eq!(model_inspect(ptr, bytes.len() as u32), 0);
+        STATE.with_borrow(|s| {
+            let header: ya_gpt::model::serialize::RichModelHeader =
+                serde_json::from_slice(&s.inspected).unwrap();
+            assert_eq!(header.authors, author);
+        });
+        assert_eq!(model_inspect_end(), 0);
+        assert_eq!(dealloc(ptr), 0);
     }
 
     #[test]

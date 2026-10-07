@@ -5,15 +5,7 @@ import { decodeMulti } from '@msgpack/msgpack';
 import { inspectModel } from '../model/inspect.ts';
 import { authorError, serializeModel } from './serialization-bridge.ts';
 import type { SerializationExports } from './serialization-bridge';
-
-async function actualWasm() {
-  const bytes = await readFile(new URL('./generated/ya_gpt_wasm.wasm', import.meta.url));
-  const unexpectedGpuCall = () => { throw new Error('Serialization must not call GPU imports'); };
-  const { instance } = await WebAssembly.instantiate(bytes, { ya_gpu: {
-    buffer_create: unexpectedGpuCall, buffer_upload: unexpectedGpuCall, buffer_release: unexpectedGpuCall, dispatch: unexpectedGpuCall,
-  } });
-  return instance.exports as unknown as SerializationExports;
-}
+import { metadataWasm as actualWasm } from '../../tests/wasm.ts';
 
 test('real WASM preserves all model data while updating or restoring its author', async () => {
   const wasm = await actualWasm();
@@ -26,8 +18,10 @@ test('real WASM preserves all model data while updating or restoring its author'
     assert.equal(fields[1], author || expected[1]);
     // Every header field, tensor, gradient, tokenizer and loss must survive unchanged.
     fields[1] = expected[1]; assert.deepEqual(fields, expected);
-    const metadata = await inspectModel(new Blob([bytes]));
-    assert.equal(metadata.header.authors, author || expected[1]);
+    const metadata = await inspectModel(new Blob([bytes]), wasm);
+    assert.equal(metadata.authors, author || expected[1]);
+    assert.equal(metadata.version, '1');
+    assert.equal(metadata.train_tokens, expected[13]);
     assert.equal(wasm.model_serialize_result_len(), 0);
     assert.equal(wasm.model_serialize_result_ptr(), 0);
     latest = bytes;
@@ -46,7 +40,7 @@ test('author limit counts UTF-8 bytes and accepts exactly the inspector limit', 
   const original = await readFile(new URL('../../tests/fixtures/micro.bin', import.meta.url));
   const author = '🦀'.repeat(16_384);
   const bytes = serializeModel(wasm, original, author);
-  assert.equal((await inspectModel(new Blob([bytes]))).header.authors, author);
+  assert.equal((await inspectModel(new Blob([bytes]), wasm)).authors, author);
   assert.throws(() => serializeModel(wasm, original, author + 'a'), /64 KiB/);
 });
 

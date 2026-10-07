@@ -26,14 +26,18 @@ for (const fixture of fixtures) {
       const path = '/src/runtime/index.ts';
       const { runtime } = await import(path);
       const updates: number[] = [];
+      const reference = new File([
+        await (await fetch('/tests/fixtures/training-dropout.bin')).arrayBuffer(),
+      ], 'reference.bin');
       const job = runtime.train(fixture.text, fixture.options, (p: { completed: number }) => updates.push(p.completed));
       let concurrent = '';
       try { await runtime.generate(new File(['x'], 'x.bin'), { backend: 'webgpu', prompt: '', num_tokens: 1, seed: '0' }); } catch (error) { concurrent = String(error); }
+      const duringTraining = await runtime.inspectModel(reference);
       const trained = await job.result;
       const file = new File([trained.bytes], 'trained.bin');
       const metadata = await runtime.inspectModel(file);
       const generated: string = await runtime.generate(file, { backend: 'webgpu', prompt: 'abc', num_tokens: 5, seed: '42' });
-      return { bytes: Array.from(trained.bytes) as number[], completed: trained.completed, stopped: trained.stopped, updates, concurrent, generated, metadata, busy: runtime.busy };
+      return { bytes: Array.from(trained.bytes) as number[], completed: trained.completed, stopped: trained.stopped, updates, concurrent, generated, metadata, duringTraining, busy: runtime.busy };
     }, fixture);
     const expected = await readFile(new URL(`./fixtures/${fixture.name}.bin`, import.meta.url));
     close([...decodeMulti(new Uint8Array(result.bytes))], [...decodeMulti(expected)]);
@@ -42,7 +46,10 @@ for (const fixture of fixtures) {
     expect(result.updates).toContain(1);
     expect(result.concurrent).toContain('already running');
     expect(Array.from(result.generated)).toHaveLength(8);
-    expect(result.metadata.header.train_loss).toBeGreaterThan(0);
+    expect(result.metadata.train_loss).toBeGreaterThan(0);
+    expect(result.metadata.version).toBe('1');
+    expect(result.metadata.train_tokens).toBe(Math.floor(Array.from(fixture.text).length * 0.9));
+    expect(result.duringTraining.version).toBe('1');
     expect(fixture.final_loss).toBeLessThan(fixture.initial_loss);
   });
 }
@@ -81,6 +88,8 @@ test('Train UI stops at a completed step, downloads and explicitly selects the r
   await expect(page.locator('.selected-model')).toContainText('Trained in browser');
   await page.getByRole('tab', { name: /Inspect/ }).click();
   await expect(page.locator('dl > div').filter({ has: page.getByText('Authors', { exact: true }) }).locator('dd')).toHaveText('Zoë 🦀 <zoe@example.test>');
+  await expect(page.locator('dl > div').filter({ has: page.getByText('Training tokens', { exact: true }) }).locator('dd'))
+    .toHaveText(Math.floor(Array.from(fixtures[0].text).length * 0.9).toLocaleString('en-US'));
   await page.getByRole('tab', { name: /Train/ }).click();
   await author.fill('');
   const fallbackDownload = page.waitForEvent('download');

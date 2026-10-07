@@ -1,6 +1,7 @@
 use msgpacker::MsgPacker;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, MsgPacker)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, MsgPacker)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
 pub struct ModelConfig {
     pub block_size: usize,

@@ -1,6 +1,6 @@
 [
   {
-    "final_loss": 1.5702513456344604,
+    "final_loss": 1.5702519416809082,
     "initial_loss": 1.7920374870300293,
     "name": "training-dropout",
     "options": {
@@ -22,7 +22,7 @@
     "text": "abcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabcabcé🦀abcabcabc"
   },
   {
-    "final_loss": 1.3453407287597656,
+    "final_loss": 1.3453419208526611,
     "initial_loss": 1.8064998388290405,
     "name": "training-learning",
     "options": {

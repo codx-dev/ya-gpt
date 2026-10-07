@@ -20,7 +20,9 @@ test('the real serialization worker updates authors without WebGPU and recovers 
     return { custom: Array.from(custom) as number[], restored: Array.from(restored) as number[], metadata, concurrent, invalid, busy: runtime.busy };
   });
   const expected = await readFile(new URL('./fixtures/training-dropout.bin', import.meta.url));
-  expect(output.metadata.header.authors).toBe('  Zoë 🦀  ');
+  expect(output.metadata.authors).toBe('  Zoë 🦀  ');
+  expect(output.metadata.version).toBe('1');
+  expect(output.metadata.train_tokens).toBeGreaterThan(0);
   const custom = [...decodeMulti(new Uint8Array(output.custom))];
   const original = [...decodeMulti(expected)];
   custom[1] = original[1]; expect(custom).toEqual(original);

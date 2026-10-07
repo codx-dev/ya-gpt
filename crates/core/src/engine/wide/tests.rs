@@ -782,7 +782,7 @@ fn models_match_and_checkpoints_work_across_backends() {
         dropout: 0.3,
         ..ModelConfig::micro()
     };
-    let tokenizer = Tokenizer::new("abcdefghijklmnopq");
+    let tokenizer = Tokenizer::char_stream("abcdefghijklmnopq");
     let mut naive = Gpt::new(&Naive, config.clone(), tokenizer.clone(), &mut rng()).unwrap();
     let mut wide = Gpt::new(&SimdWide, config, tokenizer, &mut rng()).unwrap();
     let tokens: Vec<_> = (0..18).map(|i| i % 17).collect();
@@ -824,7 +824,7 @@ fn training_reduces_loss_and_reuses_parameter_allocations() {
         n_head: 1,
         ..ModelConfig::micro()
     };
-    let tokenizer = Tokenizer::new("abc");
+    let tokenizer = Tokenizer::char_stream("abc");
     let mut model = Gpt::new(&SimdWide, config.clone(), tokenizer.clone(), &mut rng()).unwrap();
     let pointers: Vec<_> = model
         .parameters()

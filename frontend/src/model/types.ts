@@ -8,21 +8,21 @@ export interface ModelConfig {
   dropout: number;
 }
 
-export interface ModelHeader {
+export interface RichModelHeader {
   name: string;
   authors: string;
-  major: string;
+  version: string;
   fp: string;
   params: number;
   train_loss: number;
   validation_loss: number;
-}
-
-export interface ModelMetadata {
-  header: ModelHeader;
   config: ModelConfig;
   vocab_size: number;
+  /** Number of tokens in the training data split; version 0 defaults to zero. */
+  train_tokens: number;
 }
+
+export type ModelMetadata = RichModelHeader;
 
 export interface GenerateOptions {
   backend: Backend;

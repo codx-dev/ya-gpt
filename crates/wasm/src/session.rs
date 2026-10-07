@@ -48,23 +48,9 @@ fn validate(model: &Gpt<WebGpuEngine>) -> Result<()> {
         "invalid model layer count"
     );
     ensure!(
-        model.tokenizer.chars.len() == model.vocab_size,
+        model.tokenizer.vocab_size() == model.vocab_size,
         "invalid model vocabulary"
     );
-    ensure!(
-        model.tokenizer.chars.first() == Some(&'\0'),
-        "missing unknown token"
-    );
-    ensure!(
-        model.tokenizer.char_to_idx.len() == model.vocab_size,
-        "invalid tokenizer map"
-    );
-    for (i, ch) in model.tokenizer.chars.iter().enumerate() {
-        ensure!(
-            model.tokenizer.char_to_idx.get(ch) == Some(&i),
-            "invalid tokenizer index"
-        );
-    }
     parameter(&model.token_embedding, elements(&[model.vocab_size, c])?)?;
     parameter(
         &model.position_embedding,
@@ -90,7 +76,7 @@ impl Session {
     pub fn new(bytes: &[u8], prompt: &str, count: u32, seed: u64) -> Result<Self> {
         ensure!(count > 0, "new token count must be positive");
         let en = WebGpuEngine;
-        let header = Gpt::<WebGpuEngine>::header_from_bytes(bytes)?;
+        let header = Gpt::header_from_bytes(bytes)?;
         let model = Gpt::try_from_bytes(&en, bytes).context("invalid YA-GPT model")?;
         validate(&model)?;
         ensure!(

@@ -8,6 +8,8 @@ import { startTrainingWorker } from './training-client';
 import { trainingErrors } from './training-bridge';
 import { serializeInWorker } from './serialization-client';
 import { authorError } from './serialization-bridge';
+import { checkInspector } from './inspection-bridge';
+import type { InspectionExports } from './inspection-bridge';
 
 export interface RuntimeCapabilities {
   version: number;
@@ -28,6 +30,31 @@ export interface ModelRuntime {
 }
 
 let initialization: Promise<RuntimeCapabilities> | undefined;
+let compiledModule: Promise<WebAssembly.Module> | undefined;
+let inspection: Promise<InspectionExports> | undefined;
+
+function loadModule(): Promise<WebAssembly.Module> {
+  compiledModule ??= (async () => {
+    const response = await fetch(wasmUrl);
+    if (!response.ok) throw new Error(`WASM download failed: HTTP ${response.status}`);
+    return WebAssembly.compile(await response.arrayBuffer());
+  })();
+  return compiledModule;
+}
+
+function loadInspector(): Promise<InspectionExports> {
+  inspection ??= (async () => {
+    const noGpu = () => { throw new Error('Model inspection must not access the GPU.'); };
+    const instance = await WebAssembly.instantiate(await loadModule(), { ya_gpu: {
+      buffer_create: noGpu, buffer_upload: noGpu, buffer_release: noGpu, dispatch: noGpu,
+    } });
+    const exports = instance.exports as unknown as InspectionExports;
+    checkInspector(exports);
+    return exports;
+  })();
+  return inspection;
+}
+
 let bridge: WasmBridge | undefined;
 let busy = false;
 const listeners = new Set<() => void>();
@@ -37,10 +64,11 @@ export const runtime: ModelRuntime = {
   subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   initialize() {
     initialization ??= (async () => {
+      let inspect = false;
       try {
-        const response = await fetch(wasmUrl);
-        if (!response.ok) throw new Error(`WASM download failed: HTTP ${response.status}`);
-        const module = await WebAssembly.compile(await response.arrayBuffer());
+        await loadInspector();
+        inspect = true;
+        const module = await loadModule();
         const gpu = await createGpuHost();
         let train = false;
         try {
@@ -50,12 +78,14 @@ export const runtime: ModelRuntime = {
         } catch (error) { gpu.dispose(); throw error; }
         return { version: 1, inspect: true, generate: true, train };
       } catch (error) {
-        return { version: 1, inspect: true, generate: false, train: false, error: error instanceof Error ? error.message : String(error) };
+        return { version: 1, inspect, generate: false, train: false, error: error instanceof Error ? error.message : String(error) };
       }
     })();
     return initialization;
   },
-  inspectModel,
+  async inspectModel(file) {
+    return inspectModel(file, await loadInspector());
+  },
   async serializeModel(file, author) {
     if (busy) throw new Error('Another compute operation is already running.');
     if (!file.size || file.size > 0x7fff_ffff) throw new Error('Invalid model file size.');
